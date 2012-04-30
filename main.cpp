@@ -45,10 +45,6 @@ int main(void){
 }
 
 extern "C" {
-	void __attribute__ ((interrupt)) USB_IRQHandler(void) {
-		u.IRQ();
-	}
-
 	int _write(int fd, uint8_t *buf, size_t buflen) {
 		dbg.send((uint8_t *) buf, buflen);
 		return buflen;

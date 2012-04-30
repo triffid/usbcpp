@@ -1,3 +1,6 @@
+#ifndef _DESCRIPTOR_MSC_H
+#define	_DESCRIPTOR_MSC_H
+
 /* MSC Subclass Codes */
 #define MSC_SUBCLASS_RBC                0x01
 #define MSC_SUBCLASS_SFF8020I_MMC2      0x02
@@ -67,3 +70,5 @@ typedef struct __attribute__ ((packed)) {
 #define SCSI_VERIFY10                   0x2F
 #define SCSI_MODE_SELECT10              0x55
 #define SCSI_MODE_SENSE10               0x5A
+
+#endif /* _DESCRIPTOR_MSC_H */

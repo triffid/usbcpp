@@ -2,6 +2,9 @@
 
 #include <cstdio>
 
+static USBHW hw;
+static USBCTRL ctrl;
+
 usbdesc_device USB::device = {
 	DL_DEVICE,
 	DT_DEVICE,
@@ -76,7 +79,9 @@ USB::USB() {
 
 void USB::init() {
 	hw.init();
-	ctrl.init(&hw);
+	ctrl.init(this, &hw);
+
+	hw.connect();
 }
 
 void USB::IRQ() {
