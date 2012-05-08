@@ -165,8 +165,8 @@ extern "C" {
 
 /** setup packet definitions */
 typedef struct {
-	uint8_t	bmRequestType;			/**< characteristics of the specific request */
-	uint8_t	bRequest;				/**< specific request */
+	uint8_t		bmRequestType;			/**< characteristics of the specific request */
+	uint8_t		bRequest;				/**< specific request */
 	uint16_t	wValue;					/**< request specific parameter */
 	uint16_t	wIndex;					/**< request specific parameter */
 	uint16_t	wLength;				/**< length of data transfered in data phase */

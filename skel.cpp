@@ -11,7 +11,7 @@
 
 void *operator new(size_t size) throw() { return malloc(size); }
 
-void operator delete(void *p) throw() { free(p); }
+void operator delete(void *p) throw() { return free(p); }
 
 // UART *dbg = 0;
 // GPIO **leds = 0;

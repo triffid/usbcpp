@@ -7,30 +7,19 @@
 #define N_DESCRIPTORS 32
 #endif
 
-class USB;
-class USBHW;
-class USBCTRL;
-
-#include "USBHW.hpp"
 #include "USBCTRL.hpp"
 
 typedef void (*epCallback_f)(uint8_t, uint8_t);
 
 class USB {
-	friend class USBHW;
- 	friend class USBCTRL;
-
-	usbdesc_base *descriptors[N_DESCRIPTORS];
+	static USBCTRL ctrl;
+	static usbdesc_base *descriptors[N_DESCRIPTORS];
 
 	static usbdesc_device device;
 	static usbdesc_configuration conf;
 public:
 	USB();
 	void init(void);
-
-	static void IRQ(void);
-
-	static usbdesc_configuration *getConf(void);
 
 	int addDescriptor(usbdesc_base *descriptor);
 	int addDescriptor(void *descriptor);

@@ -46,7 +46,7 @@ CDEFS    = MAX_URI_LENGTH=512 __LPC17XX__
 FLAGS    = -O$(OPTIMIZE) -mcpu=$(MCU) -mthumb -mthumb-interwork -mlong-calls -ffunction-sections -fdata-sections -Wall -g -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums
 FLAGS   += $(patsubst %,-I%,$(INC))
 FLAGS   += $(patsubst %,-D%,$(CDEFS))
-CFLAGS   = $(FLAGS) -std=gnu99
+CFLAGS   = $(FLAGS) -std=gnu99 -pipe
 ASFLAGS  = $(FLAGS)
 CXXFLAGS = $(FLAGS) -fno-rtti -fno-exceptions -std=gnu++0x
 

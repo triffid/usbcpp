@@ -1,3 +1,6 @@
+#ifndef _DESCRIPTOR_H
+#define _DESCRIPTOR_H
+
 #include <stdint.h>
 
 #include	"descriptor_cdc.h"
@@ -69,48 +72,48 @@
 
 
 typedef struct {
-	uint8_t	bLength;			// descriptor length
-	uint8_t	bDescType;			// descriptor type: see enum DESCRIPTOR_TYPE
+	uint8_t		bLength;			// descriptor length
+	uint8_t		bDescType;			// descriptor type: see DT_* defines
 } usbdesc_base;
 
 typedef struct {
-	uint8_t	bLength;			// Device descriptor length (0x12)
-	uint8_t	bDescType;			// DT_DEVICE (0x01)
-	uint16_t	bcdUSB;				// USB Specification Number which device complies to - see USB_Version_Enum
-	uint8_t	bDeviceClass;		// USB Device Class - see Device_Class_Enum
-	uint8_t	bDeviceSubClass;	// Subclass Code
-	uint8_t	bDeviceProtocol;	// Protocol Code
-	uint8_t	bMaxPacketSize;		// Maximum Packet Size for Zero Endpoint. Valid Sizes are 8, 16, 32, 64
+	uint8_t		bLength;			// Device descriptor length (0x12)
+	uint8_t		bDescType;			// DT_DEVICE (0x01)
+	uint16_t	bcdUSB;				// USB Specification Number which device complies to - see USB_VERSION_* defines
+	uint8_t		bDeviceClass;		// USB Device Class - see UC_* defines
+	uint8_t		bDeviceSubClass;	// Subclass Code
+	uint8_t		bDeviceProtocol;	// Protocol Code
+	uint8_t		bMaxPacketSize;		// Maximum Packet Size for Zero Endpoint. Valid Sizes are 8, 16, 32, 64
 	uint16_t	idVendor;			// Vendor ID
 	uint16_t	idProduct;			// Product ID
 	uint16_t	bcdDevice;			// Device Release Number
-	uint8_t	iManufacturer;		// Index of Manufacturer String Descriptor
-	uint8_t	iProduct;			// Index of Product String Descriptor
-	uint8_t	iSerialNumber;		// Index of Serial Number String Descriptor
-	uint8_t	bNumConfigurations;	// Number of Possible Configurations
+	uint8_t		iManufacturer;		// Index of Manufacturer String Descriptor
+	uint8_t		iProduct;			// Index of Product String Descriptor
+	uint8_t		iSerialNumber;		// Index of Serial Number String Descriptor
+	uint8_t		bNumConfigurations;	// Number of Possible Configurations
 } usbdesc_device;
 
 typedef struct __attribute__ ((packed)) {
-	uint8_t	bLength;				// Configuration Descriptor Length (0x09)
-	uint8_t	bDescType;				// DT_CONFIGURATION (0x02)
+	uint8_t		bLength;				// Configuration Descriptor Length (0x09)
+	uint8_t		bDescType;				// DT_CONFIGURATION (0x02)
 	uint16_t	wTotalLength;			// Total length in bytes of this descriptor plus all this configuration's interfaces plus their endpoints, see http://www.beyondlogic.org/usbnutshell/confsize.gif
-	uint8_t	bNumInterfaces;			// Number of Interfaces
-	uint8_t	bConfigurationValue;	// Value to use as an argument to select this configuration
-	uint8_t	iConfiguration;			// Index of String Descriptor describing this configuration
-	uint8_t	bmAttributes;			// bitmap. see Config_Attributes_Enum
-	uint8_t	bMaxPower;				// Max. Current = bMaxPower * 2mA
+	uint8_t		bNumInterfaces;			// Number of Interfaces
+	uint8_t		bConfigurationValue;	// Value that host uses to select this configuration
+	uint8_t		iConfiguration;			// Index of String Descriptor describing this configuration
+	uint8_t		bmAttributes;			// bitmap. see CA_* defines
+	uint8_t		bMaxPower;				// Max. Current = bMaxPower * 2mA
 } usbdesc_configuration;
 
 typedef struct __attribute__ ((packed)) {
-	uint8_t	bLength;				// Interface Descriptor Length (0x09)
-	uint8_t	bDescType;				// DT_INTERFACE (0x04)
-	uint8_t	bInterfaceNumber;		// Number of Interface
-	uint8_t	bAlternateSetting;		// Value used to select alternative setting
-	uint8_t	bNumEndPoints;			// Number of Endpoints used for this interface
-	uint8_t	bInterfaceClass;		// Class Code - see Device_Class_Enum
-	uint8_t	bInterfaceSubClass;		// Subclass Code
-	uint8_t	bInterfaceProtocol;		// Protocol Code
-	uint8_t	iInterface;				// Index of String Descriptor Describing this interface
+	uint8_t		bLength;				// Interface Descriptor Length (0x09)
+	uint8_t		bDescType;				// DT_INTERFACE (0x04)
+	uint8_t		bInterfaceNumber;		// Number of Interface
+	uint8_t		bAlternateSetting;		// Value used to select alternative setting
+	uint8_t		bNumEndPoints;			// Number of Endpoints used for this interface
+	uint8_t		bInterfaceClass;		// Class Code - see Device_Class_Enum
+	uint8_t		bInterfaceSubClass;		// Subclass Code
+	uint8_t		bInterfaceProtocol;		// Protocol Code
+	uint8_t		iInterface;				// Index of String Descriptor Describing this interface
 } usbdesc_interface;
 
 typedef struct __attribute__ ((packed)) {
@@ -135,3 +138,5 @@ typedef struct __attribute__ ((packed)) {
 } usbdesc_string;
 
 #define usbdesc_string_l(l) struct __attribute__ ((packed)) { uint8_t bLength; uint8_t bDescType; uint16_t str[l]; }
+
+#endif /* _DESCRIPTOR_H */

@@ -2,8 +2,8 @@
 
 #include <cstdio>
 
-static USBHW hw;
-static USBCTRL ctrl;
+USBCTRL USB::ctrl;
+usbdesc_base *USB::descriptors[N_DESCRIPTORS];
 
 usbdesc_device USB::device = {
 	DL_DEVICE,
@@ -60,11 +60,6 @@ usbdesc_configuration USB::conf = {
 USB::USB() {
 	int i;
 
-// 	FrameHandler = &USB::defFrameHandler;
-// 	DevIntHandler = &USB::defDevIntHandler;
-// 	for (i = 0; i < 16; i++)
-// 		EPIntHandlers[i] = &USB::defEPIntHandler;
-
 	i = 0;
 	descriptors[i++] = (usbdesc_base *) &device;
 	descriptors[i++] = (usbdesc_base *) &conf;
@@ -78,13 +73,12 @@ USB::USB() {
 }
 
 void USB::init() {
-	hw.init();
-	ctrl.init(this, &hw);
+	printf("ctrl.init\n");
+	ctrl.init(descriptors);
 
-	hw.connect();
-}
-
-void USB::IRQ() {
+	printf("OK\nctrl.connect\n");
+ 	ctrl.connect();
+	printf("OK");
 }
 
 int USB::addDescriptor(usbdesc_base *descriptor) {
@@ -127,7 +121,6 @@ int USB::addInterface(usbdesc_interface *ifp) {
 
 	return n;
 }
-
 
 int USB::getFreeEndpoint() {
 	uint8_t i;
@@ -191,7 +184,7 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 			break;
 		if (descriptors[i]->bDescType == DT_ENDPOINT) {
 			usbdesc_endpoint *x = (usbdesc_endpoint *) descriptors[i];
-			if (x->bmAttributes == epp->bmAttributes)
+			if (x->bmAttributes == epp->bmAttributes && ((x->bEndpointAddress & 0x80) == (epp->bEndpointAddress & 0x80)))
 				if ((x->bEndpointAddress & 0x0F) > lepaddr)
 					lepaddr = (x->bEndpointAddress & 0x0F);
 		}
@@ -208,24 +201,24 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 		lepaddr += 3;
 	// now we have the next free logical endpoint of the appropriate type
 
-		// if it's >15 we've run out, spit an error
-		if (lepaddr > 15) return -1;
+	// if it's >15 we've run out, spit an error
+	if (lepaddr > 15) return -1;
 
-		printf("pep:%d ", lepaddr);
+	printf("pep:%d ", lepaddr);
 
-		// store logical address and direction bit as physical address, this is how the LPC17xx has its USB set up
-		epp->bEndpointAddress = lepaddr | (epp->bEndpointAddress & 0x80);
+	// store logical address and direction bit as physical address, this is how the LPC17xx has its USB set up
+	epp->bEndpointAddress = lepaddr | (epp->bEndpointAddress & 0x80);
 
-		printf("eaddr:0x%02X ", epp->bEndpointAddress);
+	printf("eaddr:0x%02X ", epp->bEndpointAddress);
 
-		descriptors[i] = (usbdesc_base *) epp;
-		// 	lastif->bNumEndPoints = n + 1;
+	descriptors[i] = (usbdesc_base *) epp;
+	// 	lastif->bNumEndPoints = n + 1;
 
-		printf(" EP complete]\n");
+	printf(" EP complete]\n");
 
-		conf.wTotalLength += descriptors[i]->bLength;
+	conf.wTotalLength += descriptors[i]->bLength;
 
-		return n;
+	return n;
 }
 
 int USB::addString(void *ss) {

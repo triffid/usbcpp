@@ -1,6 +1,7 @@
 #include "USBCTRL.hpp"
 
 #include <cstdio>
+#include <cstring>
 #include "lpc17xx_usb.h"
 
 #ifndef TRUE
@@ -15,40 +16,209 @@
 #define NULL ((void *) 0)
 #endif
 
-USBHW * USBCTRL::hw;
-USB * USBCTRL::u;
 TSetupPacket USBCTRL::Setup;
+usbdesc_base ** USBCTRL::descriptors;
+usbdesc_device *USBCTRL::dev = (usbdesc_device *) 0;
+usbdesc_configuration *USBCTRL::conf = (usbdesc_configuration *) 0;
+
+uint8_t USBCTRL::confBuffer[64];
+uint16_t USBCTRL::confSize;
+uint16_t USBCTRL::confRemain;
+uint8_t USBCTRL::confIndex;
+uint8_t USBCTRL::confSubIndex;
+
+// uint8_t bConfiguration;
+uint8_t USBCTRL::bAlternate;
+
+uint8_t USBCTRL::apbDataStore[4][8] = {
+	{ 0, 0, 0, 0, 0, 0, 0, 0, },
+	{ 0, 0, 0, 0, 0, 0, 0, 0, },
+	{ 0, 0, 0, 0, 0, 0, 0, 0, },
+	{ 0, 0, 0, 0, 0, 0, 0, 0, },
+};
+
+uint8_t *USBCTRL::pbData;
+uint8_t USBCTRL::iResidue;
+int USBCTRL::iLen;
 
 USBCTRL::USBCTRL() {}
 
-void USBCTRL::init(USB *usb, USBHW *hwp) {
-	u = usb;
-	hw = hwp;
-	hw->HwRegisterFrameHandler(&FrameHandler);
-	hw->HwRegisterDevIntHandler(&DevIntHandler);
-// 	hw->HwRegisterEpIntHandler(&EPIntHandler);
-	hw->HwRegisterEPIntHandler(0x00, &EPIntHandler);
-	hw->HwRegisterEPIntHandler(0x80, &EPIntHandler);
+void USBCTRL::init(usbdesc_base ** d) {
+	descriptors = d;
+	int confMaxSize = 0;
+	conf = (usbdesc_configuration *) 0;
+
+	for (int i = 0; descriptors[i] != (usbdesc_base *) 0; i++) {
+		printf("descriptor %d\n", i);
+		if (d[i]->bDescType == DT_DEVICE)
+			dev = (usbdesc_device *) d[i];
+		if (d[i]->bDescType == DT_CONFIGURATION) {
+			usbdesc_configuration *c = (usbdesc_configuration *) d[i];
+			if (c->wTotalLength > confMaxSize)
+				confMaxSize = c->wTotalLength;
+			if (conf == (usbdesc_configuration *) 0)
+				conf = (usbdesc_configuration *) d[i];
+		}
+	}
+
+	hw.init();
+
+// 	confBuffer = malloc(confMaxSize);
+
+// 	printf("registerHandler: Frame\n");
+	hw.HwRegisterFrameHandler(&FrameHandler);
+// 	printf("registerHandler: DevInt\n");
+	hw.HwRegisterDevIntHandler(&DevIntHandler);
+
+// 	printf("registerHandler: EP:OUT0\n");
+	hw.HwRegisterEPIntHandler(0x00, &EPIntHandler);
+// 	printf("registerHandler: EP:IN0\n");
+	hw.HwRegisterEPIntHandler(0x80, &EPIntHandler);
+
+// 	printf("registerHandler: EP:OUT0Config: 64b\n");
+	hw.HwEPConfig(0x00, 64);
+// 	printf("registerHandler: EP:IN0Config: 64b\n");
+	hw.HwEPConfig(0x80, 64);
+// 	printf("ctrl:init:end\n");
+}
+
+void USBCTRL::connect() {
+	hw.connect();
 }
 
 void USBCTRL::FrameHandler(uint16_t wFrame) {
-	printf("F%4X\t", wFrame);
+// 	printf("F%4X\t", wFrame);
 }
 
 void USBCTRL::DevIntHandler(uint8_t bDevStatus) {
-	printf("D%02X\t", bDevStatus);
+// 	printf("D%02X\t", bDevStatus);
+}
+
+void USBCTRL::DataIn() {
+	int iChunk = iResidue;
+	if (iChunk > 64)
+		iChunk = 64;
+	if (confRemain > 0) {
+		uint8_t iBuf = 0;
+		uint8_t irmn;
+		if (iChunk > confRemain)
+			iChunk = confRemain;
+		irmn = iChunk;
+		while (irmn > 0) {
+			uint8_t clen = descriptors[confIndex]->bLength - confSubIndex;
+			if (clen == 0) {
+				confIndex++;
+				confSubIndex = 0;
+				if (descriptors[confIndex] == (usbdesc_base *) 0) {
+					confRemain = 0;
+					break;
+				}
+				clen = descriptors[confIndex]->bLength;
+			}
+			if (clen > irmn)
+				clen = irmn;
+			memcpy(&confBuffer[iBuf], &((uint8_t *) descriptors[confIndex])[confSubIndex], clen);
+			iBuf += clen;
+			confSubIndex += clen;
+			irmn -= clen;
+			confRemain -= clen;
+		}
+		iChunk = iBuf;
+	}
+	printf("W%d/%d:", iChunk, iResidue);
+	for (int i = 0; i < iChunk; i++)
+		printf("0x%02X,", pbData[i]);
+	printf("\n");
+	hw.HwEPWrite(0x80, pbData, iChunk);
+	pbData += iChunk;
+	iResidue -= iChunk;
 }
 
 void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
-// 	printf("E0x%02X:%02X\t", bEP, bEPStatus);
+	printf("E0x%02X:0x%02X\t", bEP, bEPStatus);
 	if (bEP == 0x00) {
 		if (bEPStatus & EP_STATUS_SETUP) {
-			hw->HwEPRead(bEP, (uint8_t *) &Setup, sizeof(Setup));
+			// defaults for data pointer and residue
+			uint8_t iType = REQTYPE_GET_TYPE(Setup.bmRequestType);
+			pbData = &apbDataStore[iType][0];
+			iResidue = Setup.wLength;
+			iLen = Setup.wLength;
+
+			hw.HwEPRead(bEP, (uint8_t *) &Setup, sizeof(Setup));
+
+			if ((Setup.wLength == 0) ||
+				(REQTYPE_GET_DIR(Setup.bmRequestType) == REQTYPE_DIR_TO_HOST)) {
+				switch(REQTYPE_GET_TYPE(Setup.bmRequestType)) {
+					case REQTYPE_TYPE_STANDARD: {
+						printf("STDREQ:%02X,%02X,%04X,%04X,%04x\n", Setup.bmRequestType, Setup.bRequest, Setup.wValue, Setup.wIndex, Setup.wLength);
+						uint8_t r = 0;
+						switch (REQTYPE_GET_RECIP(Setup.bmRequestType)) {
+							case REQTYPE_RECIP_DEVICE: {
+								r = HandleStdDeviceReq(&Setup, &iLen, &pbData);
+								printf("TS:%d\n", iLen);
+								break;
+							}
+							case REQTYPE_RECIP_INTERFACE: {
+								r = HandleStdInterfaceReq(&Setup, &iLen, &pbData);
+								break;
+							}
+							case REQTYPE_RECIP_ENDPOINT: {
+								r = HandleStdEndPointReq(&Setup, &iLen, &pbData);
+								break;
+							}
+							case REQTYPE_RECIP_OTHER: {
+								break;
+							}
+						}
+						if (!r) {
+							hw.HwEPStall(0x80, TRUE);
+							return;
+						}
+						iResidue = iLen;
+						if (iResidue > Setup.wLength)
+							iResidue = Setup.wLength;
+
+						DataIn();
+
+						break;
+					}
+				}
+			}
+		}
+		else {
+			int iChunk;
+			if (iResidue > 0) {
+				// store data
+				iChunk = hw.HwEPRead(0x00, pbData, iResidue);
+				if (iChunk < 0) {
+					hw.HwEPStall(0x80, TRUE);
+					return;
+				}
+				pbData += iChunk;
+				iResidue -= iChunk;
+				if (iResidue == 0) {
+					// received all, send data to handler
+					uint8_t iType = REQTYPE_GET_TYPE(Setup.bmRequestType);
+					pbData = apbDataStore[iType];
+					printf("HANDLE 0x%02X with %db\n", iType, iLen);
+// 					if (!_HandleRequest(&Setup, &iLen, &pbData)) {
+// 						DBG("_HandleRequest2 failed\n");
+// 						StallControlPipe(bEPStat);
+// 						return;
+// 					}
+					// send status to host
+					DataIn();
+				}
+			}
+			else {
+				// absorb zero-length status message
+				iChunk = hw.HwEPRead(0x00, NULL, 0);
+// 				DBG(iChunk > 0 ? "?" : "");
+			}
 		}
 	}
 	else if (bEP == 0x80) {
-	}
-	else {
+		DataIn();
 	}
 }
 
@@ -67,7 +237,6 @@ void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
  */
 uint8_t USBCTRL::GetDescriptor(uint16_t wTypeIndex, uint16_t wLangID, int *piLen, uint8_t **ppbData) {
 	uint8_t	bType, bIndex;
-	uint8_t	*pab;
 	int iCurIndex;
 
 // 	ASSERT(pabDescrip != NULL);
@@ -75,31 +244,52 @@ uint8_t USBCTRL::GetDescriptor(uint16_t wTypeIndex, uint16_t wLangID, int *piLen
 	bType = GET_DESC_TYPE(wTypeIndex);
 	bIndex = GET_DESC_INDEX(wTypeIndex);
 
-	pab = (uint8_t *)pabDescrip;
 	iCurIndex = 0;
-
-	while (pab[DESC_bLength] != 0) {
-		if (pab[DESC_bDescriptorType] == bType) {
+	for (int i = 0; descriptors[i] != (usbdesc_base *) 0; i++) {
+		if (descriptors[i]->bDescType == bType) {
 			if (iCurIndex == bIndex) {
-				// set data pointer
-				*ppbData = pab;
-				// get length from structure
-				if (bType == DESC_CONFIGURATION) {
-					// configuration descriptor is an exception, length is at offset 2 and 3
-					*piLen =	(pab[CONF_DESC_wTotalLength]) |
-					(pab[CONF_DESC_wTotalLength + 1] << 8);
+				*ppbData = (uint8_t *) descriptors[i];
+				if (bType == DT_CONFIGURATION) {
+					confSize = ((usbdesc_configuration *) descriptors[i])->wTotalLength;
+					confRemain = confSize;
+					confIndex = i;
+					confSubIndex = 0;
+					*piLen = ((usbdesc_configuration *) descriptors[i])->wTotalLength;
+					*ppbData = confBuffer;
 				}
 				else {
-					// normally length is at offset 0
-					*piLen = pab[DESC_bLength];
+					*piLen = descriptors[i]->bLength;
 				}
 				return TRUE;
 			}
 			iCurIndex++;
 		}
-		// skip to next descriptor
-		pab += pab[DESC_bLength];
 	}
+// 	pab = (uint8_t *)pabDescrip;
+// 	iCurIndex = 0;
+//
+// 	while (pab[DESC_bLength] != 0) {
+// 		if (pab[DESC_bDescriptorType] == bType) {
+// 			if (iCurIndex == bIndex) {
+// 				// set data pointer
+// 				*ppbData = pab;
+// 				// get length from structure
+// 				if (bType == DESC_CONFIGURATION) {
+// 					// configuration descriptor is an exception, length is at offset 2 and 3
+// 					*piLen =	(pab[CONF_DESC_wTotalLength]) |
+// 					(pab[CONF_DESC_wTotalLength + 1] << 8);
+// 				}
+// 				else {
+// 					// normally length is at offset 0
+// 					*piLen = pab[DESC_bLength];
+// 				}
+// 				return TRUE;
+// 			}
+// 			iCurIndex++;
+// 		}
+// 		// skip to next descriptor
+// 		pab += pab[DESC_bLength];
+// 	}
 	// nothing found
 // 	DBG("Desc %x/%x not found!\n", GET_DESC_TYPE(wTypeIndex), GET_DESC_INDEX(wTypeIndex));
 	*piLen = 0;
@@ -120,63 +310,87 @@ uint8_t USBCTRL::GetDescriptor(uint16_t wTypeIndex, uint16_t wLangID, int *piLen
  * @return TRUE if successfully configured, FALSE otherwise
  */
 uint8_t USBCTRL::SetConfiguration(uint8_t bConfigIndex, uint8_t bAltSetting) {
-	uint8_t	*pab;
 	uint8_t	bCurConfig, bCurAltSetting;
-	uint8_t	bEP;
-	uint16_t	wMaxPktSize;
 
 // 	ASSERT(pabDescrip != NULL);
 
 	if (bConfigIndex == 0) {
 		// unconfigure device
-		hw->HwConfigDevice(FALSE);
+		hw.HwConfigDevice(FALSE);
 	}
 	else {
-		// configure endpoints for this configuration/altsetting
-		pab = (uint8_t *)pabDescrip;
 		bCurConfig = 0xFF;
 		bCurAltSetting = 0xFF;
 
-		while (pab[DESC_bLength] != 0) {
-
-			switch (pab[DESC_bDescriptorType]) {
-
-				case DESC_CONFIGURATION:
-					// remember current configuration index
-					bCurConfig = pab[CONF_DESC_bConfigurationValue];
+		for (int i = 0; descriptors[i] != (usbdesc_base *) 0; i++) {
+			switch(descriptors[i]->bDescType) {
+				case DT_CONFIGURATION: {
+					usbdesc_configuration *c = (usbdesc_configuration *) descriptors[i];
+					bCurConfig = c->bConfigurationValue;
+					if (bCurConfig == bConfigIndex)
+						conf = c;
 					break;
-
-				case DESC_INTERFACE:
-					// remember current alternate setting
-					bCurAltSetting = pab[INTF_DESC_bAlternateSetting];
+				}
+				case DT_INTERFACE: {
+					usbdesc_interface *inf = (usbdesc_interface *) descriptors[i];
+					bCurAltSetting = inf->bAlternateSetting;
 					break;
-
-				case DESC_ENDPOINT:
-					bEP = pab[ENDP_DESC_bEndpointAddress];
-// 					DBG("Check EP %x %d/%d %d/%d:", bEP, bCurConfig, bConfigIndex, bCurAltSetting, bAltSetting);
-					if ((bCurConfig == bConfigIndex) &&
-						(bCurAltSetting == bAltSetting)) {
-// 						DBG(" Found!\n");
-					// endpoint found for desired config and alternate setting
-					wMaxPktSize = 	(pab[ENDP_DESC_wMaxPacketSize]) |
-					(pab[ENDP_DESC_wMaxPacketSize + 1] << 8);
-					// configure endpoint
-					hw->HwEPConfig(bEP, wMaxPktSize);
-						}
-// 						else {
-// 							DBG(" No Match\n");
-// 						}
-						break;
-
-				default:
+				}
+				case DT_ENDPOINT: {
+					usbdesc_endpoint *e = (usbdesc_endpoint *) descriptors[i];
+					if ((bCurConfig == bConfigIndex) && (bCurAltSetting == bAltSetting)) {
+						hw.HwEPConfig(e->bEndpointAddress, e->wMaxPacketSize);
+						bAlternate = bAltSetting;
+					}
 					break;
+				}
 			}
-			// skip to next descriptor
-			pab += pab[DESC_bLength];
 		}
+		// configure endpoints for this configuration/altsetting
+// 		pab = (uint8_t *)pabDescrip;
+// 		bCurConfig = 0xFF;
+// 		bCurAltSetting = 0xFF;
+//
+// 		while (pab[DESC_bLength] != 0) {
+//
+// 			switch (pab[DESC_bDescriptorType]) {
+//
+// 				case DESC_CONFIGURATION:
+// 					// remember current configuration index
+// 					bCurConfig = pab[CONF_DESC_bConfigurationValue];
+// 					break;
+//
+// 				case DESC_INTERFACE:
+// 					// remember current alternate setting
+// 					bCurAltSetting = pab[INTF_DESC_bAlternateSetting];
+// 					break;
+//
+// 				case DESC_ENDPOINT:
+// 					bEP = pab[ENDP_DESC_bEndpointAddress];
+// // 					DBG("Check EP %x %d/%d %d/%d:", bEP, bCurConfig, bConfigIndex, bCurAltSetting, bAltSetting);
+// 					if ((bCurConfig == bConfigIndex) &&
+// 						(bCurAltSetting == bAltSetting)) {
+// // 						DBG(" Found!\n");
+// 					// endpoint found for desired config and alternate setting
+// 					wMaxPktSize = 	(pab[ENDP_DESC_wMaxPacketSize]) |
+// 					(pab[ENDP_DESC_wMaxPacketSize + 1] << 8);
+// 					// configure endpoint
+// 					hw.HwEPConfig(bEP, wMaxPktSize);
+// 						}
+// // 						else {
+// // 							DBG(" No Match\n");
+// // 						}
+// 						break;
+//
+// 				default:
+// 					break;
+// 			}
+// 			// skip to next descriptor
+// 			pab += pab[DESC_bLength];
+// 		}
 
 		// configure device
-		hw->HwConfigDevice(TRUE);
+		hw.HwConfigDevice(TRUE);
 	}
 
 	return TRUE;
@@ -206,7 +420,8 @@ uint8_t USBCTRL::HandleStdDeviceReq(TSetupPacket *pSetup, int *piLen, uint8_t **
 			break;
 
 		case REQ_SET_ADDRESS:
-			hw->HwSetAddress(pSetup->wValue);
+			printf("USBADDR %d!\n", pSetup->wValue);
+			hw.HwSetAddress(pSetup->wValue);
 			break;
 
 		case REQ_GET_DESCRIPTOR:
@@ -215,7 +430,7 @@ uint8_t USBCTRL::HandleStdDeviceReq(TSetupPacket *pSetup, int *piLen, uint8_t **
 
 		case REQ_GET_CONFIGURATION:
 			// indicate if we are configured
-			pbData[0] = bConfiguration;
+			pbData[0] = conf->bConfigurationValue;
 			*piLen = 1;
 			break;
 
@@ -225,7 +440,7 @@ uint8_t USBCTRL::HandleStdDeviceReq(TSetupPacket *pSetup, int *piLen, uint8_t **
 				return FALSE;
 			}
 			// configuration successful, update current configuration
-			bConfiguration = pSetup->wValue & 0xFF;
+// 			bConfiguration = pSetup->wValue & 0xFF;
 			break;
 
 		case REQ_CLEAR_FEATURE:
@@ -284,13 +499,13 @@ uint8_t USBCTRL::HandleStdInterfaceReq(TSetupPacket	*pSetup, int *piLen, uint8_t
 
 		case REQ_SET_INTERFACE:	// TODO use bNumInterfaces
 		// there is only one interface (= 0)
-		if (pSetup->wValue > u->getConf()->bNumInterfaces) {
+		if (pSetup->wValue > conf->bNumInterfaces) {
 			return FALSE;
 		}
 // 		DBG("Set alternate %d", pSetup->wValue);
-		if (SetConfiguration(bConfiguration, pSetup->wValue)) {
+		if (SetConfiguration(conf->bConfigurationValue, pSetup->wValue)) {
 // 			DBG(" OK\n");
-			bAlternate = pSetup->wValue;
+// 			bAlternate = pSetup->wValue;
 		}
 		else {
 // 			DBG(" failed!\n");
@@ -323,7 +538,7 @@ uint8_t USBCTRL::HandleStdEndPointReq(TSetupPacket	*pSetup, int *piLen, uint8_t 
 	switch (pSetup->bRequest) {
 		case REQ_GET_STATUS:
 			// bit 0 = endpointed halted or not
-			pbData[0] = (hw->HwEPGetStatus(pSetup->wIndex) & EP_STATUS_STALLED) ? 1 : 0;
+			pbData[0] = (hw.HwEPGetStatus(pSetup->wIndex) & EP_STATUS_STALLED) ? 1 : 0;
 			pbData[1] = 0;
 			*piLen = 2;
 			break;
@@ -331,7 +546,7 @@ uint8_t USBCTRL::HandleStdEndPointReq(TSetupPacket	*pSetup, int *piLen, uint8_t 
 		case REQ_CLEAR_FEATURE:
 			if (pSetup->wValue == FEA_ENDPOINT_HALT) {
 				// clear HALT by unstalling
-				hw->HwEPStall(pSetup->wIndex, FALSE);
+				hw.HwEPStall(pSetup->wIndex, FALSE);
 				break;
 			}
 			// only ENDPOINT_HALT defined for endpoints
@@ -340,7 +555,7 @@ uint8_t USBCTRL::HandleStdEndPointReq(TSetupPacket	*pSetup, int *piLen, uint8_t 
 		case REQ_SET_FEATURE:
 			if (pSetup->wValue == FEA_ENDPOINT_HALT) {
 				// set HALT by stalling
-				hw->HwEPStall(pSetup->wIndex, TRUE);
+				hw.HwEPStall(pSetup->wIndex, TRUE);
 				break;
 			}
 			// only ENDPOINT_HALT defined for endpoints

@@ -1,3 +1,6 @@
+#ifndef _DESCRIPTOR_CDC_H
+#define _DESCRIPTOR_CDC_H
+
 #define	DT_CDC_DESCRIPTOR           36
 #define	DT_CDC_ENDPOINT             37
 
@@ -80,3 +83,5 @@ typedef struct __attribute__ ((packed)) {
 	uint8_t	bNumberPowerFilters;	// 0
 } usbcdc_ether;
 #define USB_CDC_LENGTH_ETHER sizeof(usbcdc_ether)
+
+#endif /* _DESCRIPTOR_CDC_H */
