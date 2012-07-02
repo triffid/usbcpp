@@ -7,20 +7,20 @@
 #define	GPIO_DIR_OUTPUT 1
 
 class GPIO {
-		uint8_t port;
-		uint8_t pin;
-		uint8_t io;
-		uint8_t value;
-	public:
-		GPIO(uint8_t prt, uint8_t pn);
-// 		~GPIO();
-		void set_direction(uint8_t direction);
-		void output();
-		void input();
-		void write(uint8_t value);
-		void set();
-		void clear();
-		uint8_t get();
+public:
+	uint8_t port;
+	uint8_t pin;
+	GPIO(uint8_t port, uint8_t pin);
+	GPIO(uint8_t port, uint8_t pin, uint8_t direction);
+	// 		~GPIO();
+	void setup();
+	void set_direction(uint8_t direction);
+	void output();
+	void input();
+	void write(uint8_t value);
+	void set();
+	void clear();
+	uint8_t get();
 };
 
 #endif /* _GPIO_HPP */

@@ -4,26 +4,35 @@
 #include "lpc17xx_pinsel.h"
 #include "lpc17xx_gpio.h"
 
-GPIO::GPIO(uint8_t prt, uint8_t pn) {
-	port = prt;
-	pin = pn;
-	io = 0;
-	value = 0;
+GPIO::GPIO(uint8_t port, uint8_t pin) {
+	GPIO::port = port;
+	GPIO::pin = pin;
 
+	setup();
+}
+
+GPIO::GPIO(uint8_t port, uint8_t pin, uint8_t direction) {
+	GPIO::port = port;
+	GPIO::pin = pin;
+
+	setup();
+
+	set_direction(direction);
+}
+// GPIO::~GPIO() {}
+
+void GPIO::setup() {
 	PINSEL_CFG_Type PinCfg;
 	PinCfg.Funcnum = 0;
 	PinCfg.OpenDrain = PINSEL_PINMODE_NORMAL;
 	PinCfg.Pinmode = PINSEL_PINMODE_TRISTATE;
-	PinCfg.Portnum = prt;
-	PinCfg.Pinnum = pn;
+	PinCfg.Portnum = GPIO::port;
+	PinCfg.Pinnum = GPIO::pin;
 	PINSEL_ConfigPin(&PinCfg);
 }
 
-// GPIO::~GPIO() {}
-
 void GPIO::set_direction(uint8_t direction) {
-	FIO_SetDir(port, pin, direction);
-	io = direction;
+	FIO_SetDir(port, 1UL << pin, direction);
 }
 
 void GPIO::output() {
@@ -35,10 +44,11 @@ void GPIO::input() {
 }
 
 void GPIO::write(uint8_t value) {
+	output();
 	if (value)
-		FIO_SetValue(port, 1UL << pin);
+		set();
 	else
-		FIO_ClearValue(port, 1UL << pin);
+		clear();
 }
 
 void GPIO::set() {
