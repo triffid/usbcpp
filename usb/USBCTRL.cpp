@@ -38,7 +38,7 @@ uint8_t USBCTRL::apbDataStore[4][8] = {
 };
 
 uint8_t *USBCTRL::pbData;
-uint8_t USBCTRL::iResidue;
+uint16_t USBCTRL::iResidue;
 int USBCTRL::iLen;
 
 USBCTRL::USBCTRL() {}
@@ -99,6 +99,7 @@ void USBCTRL::DataIn() {
 	if (iChunk > 64)
 		iChunk = 64;
 	if (confRemain > 0) {
+		pbData = confBuffer;
 		uint8_t iBuf = 0;
 		uint8_t irmn;
 		if (iChunk > confRemain)
