@@ -18,7 +18,7 @@ class USBCTRL {
 	static uint8_t confSubIndex;
 
 	static uint8_t *pbData;
-	static uint8_t iResidue;
+	static uint16_t iResidue;
 	static int iLen;
 
 	static uint8_t apbDataStore[4][8];

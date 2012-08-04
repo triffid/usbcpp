@@ -5,6 +5,7 @@
 #include "USBECM.hpp"
 
 #include "uart.hpp"
+#include "gpio.hpp"
 
 #include "CLOCK.hpp"
 #include "WATCHDOG.hpp"
@@ -19,39 +20,73 @@ WATCHDOG w(5 WATCHDOG_SECONDS);
 
 clock sysclock;
 
-UART dbg(0, 230400);
+UART dbg(0, 115200);
 
 uint8_t mac[6] = { 0xAE, 0xF0, 0x28, 0x5D, 0x66, 0x21 };
 
-int main(void){
-	printf("start\n");
+#define N_LEDS 5
+
+GPIO leds[N_LEDS] = {
+	GPIO(1, 18, GPIO_DIR_OUTPUT),
+	GPIO(1, 19, GPIO_DIR_OUTPUT),
+	GPIO(1, 20, GPIO_DIR_OUTPUT),
+	GPIO(1, 21, GPIO_DIR_OUTPUT),
+	GPIO(4, 28, GPIO_DIR_OUTPUT),
+};
+
+uint8_t mystery[16] = { 0x02, 0x48 , 0x4f , 0xf3 , 0xc0 , 0x04 , 0x04 , 0x05  , 0x81 , 0xc1 , 0x1c , 0x00 , 0x01 , 0x03 , 0x00 , 0x3d };
+
+void dbgled(int l) {
+// 	iprintf("l%X:", l & ((1 << N_LEDS) - 1));
+	for (int i = 0; i < N_LEDS; i++) {
+		leds[i].write(l & 1);
+// 		iprintf("[%d:%d=%d]", leds[i].port, leds[i].pin, l & 1);
+		l >>= 1;
+	}
+// 	iprintf("\n");
+}
+
+int main(void) {
+	dbgled(0);
+
+	iprintf("start\n");
 
 	uc.attach(&u);
 	msc.attach(&u);
 	ecm.setMAC(mac);
 	ecm.attach(&u);
 
-	printf("u.dump\n");
+	iprintf("u.dump\n");
 
 	u.dumpDescriptors();
 
-	printf("u.init\n");
+	iprintf("u.init\n");
 
 	u.init();
 
 	sysclock.setTimeout(5 S);
 
+	// because leds[0] is connected to USB_UP_LED signal and usb hardware takes it over
+	leds[0].setup();
+
+// 	dbgled(15);
+
+// 	int l = 0;
+
 	while (1) {
 		if (sysclock.poll()) {
-// 			printf("-------------------\n");
-// 			printf("USBClkCtrl:   0x%8lX\n", LPC_USB->USBClkCtrl);
-// 			printf("USBClkSt:     0x%8lX\n", LPC_USB->USBClkSt);
-// 			printf("USBIntSt:     0x%8lX\n", LPC_SC->USBIntSt);
-// 			printf("USBDevIntSt:  0x%8lX\n", LPC_USB->USBDevIntSt);
-// 			printf("USBDevIntEn:  0x%8lX\n", LPC_USB->USBDevIntEn);
-// 			printf("USBDevIntPri: 0x%8lX\n", LPC_USB->USBDevIntPri);
+// 			iprintf("-------------------\n");
+// 			iprintf("USBClkCtrl:   0x%8lX\n", LPC_USB->USBClkCtrl);
+// 			iprintf("USBClkSt:     0x%8lX\n", LPC_USB->USBClkSt);
+// 			iprintf("USBIntSt:     0x%8lX\n", LPC_SC->USBIntSt);
+// 			iprintf("USBDevIntSt:  0x%8lX\n", LPC_USB->USBDevIntSt);
+// 			iprintf("USBDevIntEn:  0x%8lX\n", LPC_USB->USBDevIntEn);
+// 			iprintf("USBDevIntPri: 0x%8lX\n", LPC_USB->USBDevIntPri);
 		}
 		w.feed();
+// 		l++;
+// 		if ((l & ((1UL << 19) - 1UL)) == 0)
+// 			dbgled(l >> 19);
 	}
 }
 

@@ -8,17 +8,17 @@ usbdesc_base *USB::descriptors[N_DESCRIPTORS];
 usbdesc_device USB::device = {
 	DL_DEVICE,
 	DT_DEVICE,
-	USB_VERSION_1_1,	// .bcdUSB
+	USB_VERSION_2_0,	// .bcdUSB
 	UC_PER_INTERFACE,	// .bDeviceClass
 	0,					// .bDeviceSubClass
 	0,					// .bDeviceProtocol
-	8,					// .bMaxPacketSize0
+	64,					// .bMaxPacketSize0
 	0xFFFF,				// .idVendor
 	0x0005,				// .idProduct
 	0x0100,				// .bcdDevice
-	1,					// .iManufacturer
-	2,					// .iProduct
-	3,					// .iSerialNumber
+	0,					// .iManufacturer
+	0,					// .iProduct
+	0,					// .iSerialNumber
 	1,					// .bNumConfigurations
 };
 
@@ -34,16 +34,22 @@ static usbdesc_string_l(10) manufacturer = {
 	{ 'U', 'S', 'B', ' ', 'M', 'a', 'g', 'i', 'c', '!' }
 };
 
-static usbdesc_string_l(4) product = {
-	10,					// .bLength: 2 + 2 * nchars
+static usbdesc_string_l(8) product = {
+	18,					// .bLength: 2 + 2 * nchars
 	DT_STRING,			// .bDescType
-	{ 'R','2','C','2' }
+	{ 'S','m','o','o','t','h','i','e' }
 };
 
 static usbdesc_string_l(6) serial = {
 	14,					// .bLength: 2 + 2 * nchars
 	DT_STRING,			// .bDescType
 	{ 'A', '1', 'X', 'T', 'Q', 'Z' }
+};
+
+static usbdesc_string_l(7) str_default = {
+	16,					// .bLength: 2 + 2 * nchars
+	DT_STRING,			// .bDescType
+	{ 'D','e','f','a','u','l','t' }
 };
 
 usbdesc_configuration USB::conf = {
@@ -67,18 +73,19 @@ USB::USB() {
 		descriptors[i] = (usbdesc_base *) 0;
 
 	addString(&lang);
-	addString(&manufacturer);
-	addString(&product);
-	addString(&serial);
+	device.iManufacturer = addString(&manufacturer);
+	device.iProduct = addString(&product);
+	device.iSerialNumber = addString(&serial);
+	conf.iConfiguration = addString(&str_default);
 }
 
 void USB::init() {
-	printf("ctrl.init\n");
+	iprintf("ctrl.init\n");
 	ctrl.init(descriptors);
 
-	printf("OK\nctrl.connect\n");
+	iprintf("OK\nctrl.connect\n");
  	ctrl.connect();
-	printf("OK");
+	iprintf("OK");
 }
 
 int USB::addDescriptor(usbdesc_base *descriptor) {
@@ -114,7 +121,7 @@ int USB::addInterface(usbdesc_interface *ifp) {
 			n--;
 
 	ifp->bInterfaceNumber = n;
-	printf("[inserting Interface %p at %d]\n", ifp, i);
+	iprintf("[inserting Interface %p at %d]\n", ifp, i);
 	descriptors[i] = (usbdesc_base *) ifp;
 	conf.bNumInterfaces = n + 1;
 	conf.wTotalLength += descriptors[i]->bLength;
@@ -150,7 +157,7 @@ int USB::getFreeEndpoint() {
 }
 
 int USB::addEndpoint(usbdesc_endpoint *epp) {
-	printf("[EP ");
+	iprintf("[EP ");
 	uint8_t i;
 	usbdesc_interface *lastif = (usbdesc_interface *) 0;
 	for (i = 0; i < N_DESCRIPTORS; i++) {
@@ -159,17 +166,17 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 		if (descriptors[i]->bDescType == DT_INTERFACE)
 			lastif = (usbdesc_interface *) descriptors[i];
 	}
-	printf("%d:%p ", i, lastif);
+	iprintf("%d:%p ", i, lastif);
 	if (i >= N_DESCRIPTORS) return -1;
 	if (lastif == (usbdesc_interface *) 0) return -1;
 
 	int n = getFreeEndpoint();
 
-	printf("n:%d ", n);
+	iprintf("n:%d ", n);
 
-	printf("0x%02X:%s ", epp->bEndpointAddress, ((epp->bEndpointAddress & EP_DIR_IN)?"IN":"OUT"));
+	iprintf("0x%02X:%s ", epp->bEndpointAddress, ((epp->bEndpointAddress & EP_DIR_IN)?"IN":"OUT"));
 
-	printf("%p ", epp);
+	iprintf("%p ", epp);
 
 	// TODO: assign .bEndpointAddress appropriately
 	// we need to scan through our descriptors, and find the first unused logical endpoint of the appropriate type
@@ -190,7 +197,7 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 		}
 	}
 
-	printf("lep:%d ", lepaddr);
+	iprintf("lep:%d ", lepaddr);
 
 	// now, lepaddr is the last logical endpoint of appropriate type
 	// the endpoints go in groups of 3, except for the last one which is a bulk instead of isochronous
@@ -204,17 +211,17 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 	// if it's >15 we've run out, spit an error
 	if (lepaddr > 15) return -1;
 
-	printf("pep:%d ", lepaddr);
+	iprintf("pep:%d ", lepaddr);
 
 	// store logical address and direction bit as physical address, this is how the LPC17xx has its USB set up
 	epp->bEndpointAddress = lepaddr | (epp->bEndpointAddress & 0x80);
 
-	printf("eaddr:0x%02X ", epp->bEndpointAddress);
+	iprintf("eaddr:0x%02X ", epp->bEndpointAddress);
 
 	descriptors[i] = (usbdesc_base *) epp;
 	// 	lastif->bNumEndPoints = n + 1;
 
-	printf(" EP complete]\n");
+	iprintf(" EP complete]\n");
 
 	conf.wTotalLength += descriptors[i]->bLength;
 
@@ -223,9 +230,9 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 
 int USB::addString(void *ss) {
 	usbdesc_base *s = (usbdesc_base *) ss;
-	printf("[AST %p ", s);
+	iprintf("[AST %p ", s);
 	if (s->bDescType == DT_STRING) {
-		printf("LEN:%d ", s->bLength);
+		iprintf("LEN:%d ", s->bLength);
 
 		uint8_t i;
 		uint8_t stringcount = 0;
@@ -237,17 +244,17 @@ int USB::addString(void *ss) {
 		}
 		if (i >= N_DESCRIPTORS) return -1;
 
-		printf("INS %d ", i);
+		iprintf("INS %d ", i);
 
 		descriptors[i] = s;
 
 		conf.wTotalLength += descriptors[i]->bLength;
 
-		printf("%p STROK]", descriptors[i]);
+		iprintf("%p STROK]", descriptors[i]);
 
 		return stringcount;
 	}
-	printf("INVAL]\n");
+	iprintf("INVAL]\n");
 	return -1;
 }
 
@@ -267,57 +274,57 @@ int USB::findStringIndex(uint8_t strid) {
 }
 
 void USB::dumpDevice(usbdesc_device *d) {
-	printf("Device:\n");
-	printf("\tUSB Version:  %d.%d\n", d->bcdUSB >> 8, d->bcdUSB & 0xFF);
-	printf("\tClass:        0x%04X\n", d->bDeviceClass);
-	printf("\tSubClass:     0x%04X\n", d->bDeviceSubClass);
-	printf("\tProtocol:     0x%04X\n", d->bDeviceProtocol);
-	printf("\tMax Packet:   %d\n", d->bMaxPacketSize);
-	printf("\tVendor:       0x%04X\n", d->idVendor);
-	printf("\tProduct:      0x%04X\n", d->idProduct);
-	printf("\tManufacturer: "); dumpString(d->iManufacturer);
-	printf("\tProduct:      "); dumpString(d->iProduct);
-	printf("\tSerial:       "); dumpString(d->iSerialNumber);
-	printf("\tNum Configs:  %d\n", d->bNumConfigurations);
+	iprintf("Device:\n");
+	iprintf("\tUSB Version:  %d.%d\n", d->bcdUSB >> 8, d->bcdUSB & 0xFF);
+	iprintf("\tClass:        0x%04X\n", d->bDeviceClass);
+	iprintf("\tSubClass:     0x%04X\n", d->bDeviceSubClass);
+	iprintf("\tProtocol:     0x%04X\n", d->bDeviceProtocol);
+	iprintf("\tMax Packet:   %d\n", d->bMaxPacketSize);
+	iprintf("\tVendor:       0x%04X\n", d->idVendor);
+	iprintf("\tProduct:      0x%04X\n", d->idProduct);
+	iprintf("\tManufacturer: "); dumpString(d->iManufacturer);
+	iprintf("\tProduct:      "); dumpString(d->iProduct);
+	iprintf("\tSerial:       "); dumpString(d->iSerialNumber);
+	iprintf("\tNum Configs:  %d\n", d->bNumConfigurations);
 }
 
 void USB::dumpConfiguration(usbdesc_configuration *c) {
-	printf("Configuration:\n");
-	printf("\tTotal Length:        %db\n", c->wTotalLength);
-	printf("\tNum Interfaces:      %d\n", c->bNumInterfaces);
-	printf("\tConfiguration Value: %d\n", c->bConfigurationValue);
-	printf("\tConfiguration:       "); dumpString(c->iConfiguration);
-	printf("\tAttributes:          %s\n", ((c->bmAttributes & 0x80)?"Bus Powered":"Self Powered"));
-	printf("\tMax Power:           %dmA\n", c->bMaxPower * 2);
+	iprintf("Configuration:\n");
+	iprintf("\tTotal Length:        %db\n", c->wTotalLength);
+	iprintf("\tNum Interfaces:      %d\n", c->bNumInterfaces);
+	iprintf("\tConfiguration Value: %d\n", c->bConfigurationValue);
+	iprintf("\tConfiguration:       "); dumpString(c->iConfiguration);
+	iprintf("\tAttributes:          %s\n", ((c->bmAttributes & 0x80)?"Bus Powered":"Self Powered"));
+	iprintf("\tMax Power:           %dmA\n", c->bMaxPower * 2);
 }
 
 void USB::dumpInterface(usbdesc_interface *i) {
-	printf("\t*Interface\n");
-	printf("\t\tNumber:        %d\n", i->bInterfaceNumber);
-	printf("\t\tAlternate:     %d\n", i->bAlternateSetting);
-	printf("\t\tNum Endpoints: %d\n", i->bNumEndPoints);
-	printf("\t\tClass:         0x%02X ", i->bInterfaceClass);
+	iprintf("\t*Interface\n");
+	iprintf("\t\tNumber:        %d\n", i->bInterfaceNumber);
+	iprintf("\t\tAlternate:     %d\n", i->bAlternateSetting);
+	iprintf("\t\tNum Endpoints: %d\n", i->bNumEndPoints);
+	iprintf("\t\tClass:         0x%02X ", i->bInterfaceClass);
 	switch(i->bInterfaceClass) {
 		case UC_COMM:
-			printf("(COMM)");
+			iprintf("(COMM)");
 			break;
 		case UC_MASS_STORAGE:
-			printf("(MSC)");
+			iprintf("(MSC)");
 			break;
 		case UC_CDC_DATA:
-			printf("(CDC DATA)");
+			iprintf("(CDC DATA)");
 			break;
 	}
-	printf("\n");
-	printf("\t\tSubClass:      0x%02X ", i->bInterfaceSubClass);
+	iprintf("\n");
+	iprintf("\t\tSubClass:      0x%02X ", i->bInterfaceSubClass);
 	switch(i->bInterfaceClass) {
 		case UC_COMM: {
 			switch(i->bInterfaceSubClass) {
 				case USB_CDC_SUBCLASS_ACM:
-					printf("(ACM)");
+					iprintf("(ACM)");
 					break;
 				case USB_CDC_SUBCLASS_ETHERNET:
-					printf("(ETHERNET)");
+					iprintf("(ETHERNET)");
 					break;
 			}
 			break;
@@ -325,36 +332,36 @@ void USB::dumpInterface(usbdesc_interface *i) {
 		case UC_MASS_STORAGE: {
 			switch(i->bInterfaceSubClass) {
 				case MSC_SUBCLASS_SCSI:
-					printf("(SCSI)");
+					iprintf("(SCSI)");
 					break;
 			}
 			break;
 		}
 	}
-	printf("\n");
-	printf("\t\tProtocol:      0x%02X ", i->bInterfaceProtocol);
-	printf("\n");
-	printf("\t\tInterface:     "); dumpString(i->iInterface);
+	iprintf("\n");
+	iprintf("\t\tProtocol:      0x%02X ", i->bInterfaceProtocol);
+	iprintf("\n");
+	iprintf("\t\tInterface:     "); dumpString(i->iInterface);
 }
 void USB::dumpEndpoint(usbdesc_endpoint *e) {
 	static const char* const attr[4] = { "", "Isochronous", "Bulk", "Interrupt" };
-	printf("\t\t*Endpoint\n");
-	printf("\t\t\tAddress:    0x%02X (%s)\n", e->bEndpointAddress, ((e->bEndpointAddress & EP_DIR_IN)?"IN":"OUT"));
-	printf("\t\t\tAttributes: 0x%02X (%s)\n", e->bmAttributes, attr[e->bmAttributes]);
-	printf("\t\t\tMax Packet: %d\n", e->wMaxPacketSize);
-	printf("\t\t\tInterval:   %d\n", e->bInterval);
+	iprintf("\t\t*Endpoint\n");
+	iprintf("\t\t\tAddress:    0x%02X (%s)\n", e->bEndpointAddress, ((e->bEndpointAddress & EP_DIR_IN)?"IN":"OUT"));
+	iprintf("\t\t\tAttributes: 0x%02X (%s)\n", e->bmAttributes, attr[e->bmAttributes]);
+	iprintf("\t\t\tMax Packet: %d\n", e->wMaxPacketSize);
+	iprintf("\t\t\tInterval:   %d\n", e->bInterval);
 }
 
 void USB::dumpString(int i) {
 	if (i > 0) {
 		uint8_t j = findStringIndex(i);
 		if (j > 0) {
-			printf("[%d] ", i);
+			iprintf("[%d] ", i);
 			dumpString((usbdesc_string *) descriptors[j]);
 			return;
 		}
 	}
-	printf("-none-\n");
+	iprintf("-none-\n");
 }
 
 void USB::dumpString(usbdesc_string *s) {
@@ -363,7 +370,7 @@ void USB::dumpString(usbdesc_string *s) {
 		if (s->str[i] >= 32 && s->str[i] < 128)
 			putchar(s->str[i]);
 		else
-			printf("\\0x%02X", s->str[i]);
+			iprintf("\\0x%02X", s->str[i]);
 	}
 	putchar('\n');
 }
@@ -372,52 +379,52 @@ void USB::dumpCDC(uint8_t *d) {
 	switch(d[2]) {
 		case USB_CDC_SUBTYPE_HEADER: {
 			usbcdc_header *h = (usbcdc_header *) d;
-			printf("\t\t*CDC header\n");
-			printf("\t\t\tbcdCDC:  0x%04X\n", h->bcdCDC);
+			iprintf("\t\t*CDC header\n");
+			iprintf("\t\t\tbcdCDC:  0x%04X\n", h->bcdCDC);
 			break;
 		}
 		case USB_CDC_SUBTYPE_UNION: {
 			usbcdc_union *u = (usbcdc_union *) d;
-			printf("\t\t*CDC union\n");
-			printf("\t\t\tMaster:  %d\n", u->bMasterInterface);
-			printf("\t\t\tSlave:   %d\n", u->bSlaveInterface0);
+			iprintf("\t\t*CDC union\n");
+			iprintf("\t\t\tMaster:  %d\n", u->bMasterInterface);
+			iprintf("\t\t\tSlave:   %d\n", u->bSlaveInterface0);
 			break;
 		}
 		case USB_CDC_SUBTYPE_CALL_MANAGEMENT: {
 			usbcdc_callmgmt *m = (usbcdc_callmgmt *) d;
-			printf("\t\t*CDC Call Management\n");
-			printf("\t\t\tCapabilities:  0x%02X ", m->bmCapabilities);
+			iprintf("\t\t*CDC Call Management\n");
+			iprintf("\t\t\tCapabilities:  0x%02X ", m->bmCapabilities);
 			if (m->bmCapabilities & USB_CDC_CALLMGMT_CAP_CALLMGMT)
-				printf("(CALLMGMT)");
+				iprintf("(CALLMGMT)");
 			if (m->bmCapabilities & USB_CDC_CALLMGMT_CAP_DATAINTF)
-				printf("(DATAINTF)");
-			printf("\n");
-			printf("\t\t\tData Interface: %d\n", m->bDataInterface);
+				iprintf("(DATAINTF)");
+			iprintf("\n");
+			iprintf("\t\t\tData Interface: %d\n", m->bDataInterface);
 			break;
 		}
 		case USB_CDC_SUBTYPE_ACM: {
 			usbcdc_acm *a = (usbcdc_acm *) d;
-			printf("\t\t*CDC ACM\n");
-			printf("\t\t\tCapabilities: 0x%02X ", a->bmCapabilities);
+			iprintf("\t\t*CDC ACM\n");
+			iprintf("\t\t\tCapabilities: 0x%02X ", a->bmCapabilities);
 			if (a->bmCapabilities & USB_CDC_ACM_CAP_COMM)
-				printf("(COMM)");
+				iprintf("(COMM)");
 			if (a->bmCapabilities & USB_CDC_ACM_CAP_LINE)
-				printf("(LINE)");
+				iprintf("(LINE)");
 			if (a->bmCapabilities & USB_CDC_ACM_CAP_BRK)
-				printf("(BRK)");
+				iprintf("(BRK)");
 			if (a->bmCapabilities & USB_CDC_ACM_CAP_NOTIFY)
-				printf("(NOTIFY)");
-			printf("\n");
+				iprintf("(NOTIFY)");
+			iprintf("\n");
 			break;
 		}
 		case USB_CDC_SUBTYPE_ETHERNET: {
 			usbcdc_ether *e = (usbcdc_ether *) d;
-			printf("\t\t*CDC Ethernet\n");
-			printf("\t\t\tMAC address: "); dumpString(e->iMacAddress);
-			printf("\t\t\tStatistics: 0x%02lX\n", e->bmEthernetStatistics);
-			printf("\t\t\tMax Segment Size: %d\n", e->wMaxSegmentSize);
-			printf("\t\t\tMC Filters: %d\n", e->wNumberMCFilters);
-			printf("\t\t\tPower Filters: %d\n", e->bNumberPowerFilters);
+			iprintf("\t\t*CDC Ethernet\n");
+			iprintf("\t\t\tMAC address: "); dumpString(e->iMacAddress);
+			iprintf("\t\t\tStatistics: 0x%02lX\n", e->bmEthernetStatistics);
+			iprintf("\t\t\tMax Segment Size: %d\n", e->wMaxSegmentSize);
+			iprintf("\t\t\tMC Filters: %d\n", e->wNumberMCFilters);
+			iprintf("\t\t\tPower Filters: %d\n", e->bNumberPowerFilters);
 			break;
 		}
 	}
@@ -427,10 +434,10 @@ void USB::dumpDescriptors() {
 	uint8_t i;
 	for (i = 0; i < N_DESCRIPTORS; i++) {
 		if (descriptors[i] == (usbdesc_base *) 0) {
-			printf("--- FIN at %d\n", i);
+			iprintf("--- FIN at %d\n", i);
 			return;
 		}
-		printf("[%d:+%d]", i, descriptors[i]->bLength);
+		iprintf("[%d:+%d]", i, descriptors[i]->bLength);
 		switch (descriptors[i]->bDescType) {
 			case DT_DEVICE: {
 				dumpDevice((usbdesc_device *) descriptors[i]);

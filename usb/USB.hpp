@@ -11,6 +11,11 @@
 
 typedef void (*epCallback_f)(uint8_t, uint8_t);
 
+class USB_EP_Receiver {
+public:
+	int EpCallback(uint8_t, uint8_t);
+};
+
 class USB {
 	static USBCTRL ctrl;
 	static usbdesc_base *descriptors[N_DESCRIPTORS];
@@ -29,8 +34,9 @@ public:
 	int getFreeEndpoint();
 	int findStringIndex(uint8_t strid);
 
-	epCallback_f EpCallback(uint8_t);
-	void EpCallback(uint8_t, epCallback_f);
+// 	epCallback_f EpCallback(uint8_t);
+// 	void EpCallback(uint8_t, epCallback_f);
+	void setEpCallback(uint8_t, USB_EP_Receiver *);
 
 	void dumpDescriptors();
 	void dumpDevice(usbdesc_device *);

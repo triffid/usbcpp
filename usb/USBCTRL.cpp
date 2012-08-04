@@ -49,7 +49,7 @@ void USBCTRL::init(usbdesc_base ** d) {
 	conf = (usbdesc_configuration *) 0;
 
 	for (int i = 0; descriptors[i] != (usbdesc_base *) 0; i++) {
-		printf("descriptor %d\n", i);
+		iprintf("descriptor %d\n", i);
 		if (d[i]->bDescType == DT_DEVICE)
 			dev = (usbdesc_device *) d[i];
 		if (d[i]->bDescType == DT_CONFIGURATION) {
@@ -65,21 +65,21 @@ void USBCTRL::init(usbdesc_base ** d) {
 
 // 	confBuffer = malloc(confMaxSize);
 
-// 	printf("registerHandler: Frame\n");
+// 	iprintf("registerHandler: Frame\n");
 	hw.HwRegisterFrameHandler(&FrameHandler);
-// 	printf("registerHandler: DevInt\n");
+// 	iprintf("registerHandler: DevInt\n");
 	hw.HwRegisterDevIntHandler(&DevIntHandler);
 
-// 	printf("registerHandler: EP:OUT0\n");
+// 	iprintf("registerHandler: EP:OUT0\n");
 	hw.HwRegisterEPIntHandler(0x00, &EPIntHandler);
-// 	printf("registerHandler: EP:IN0\n");
+// 	iprintf("registerHandler: EP:IN0\n");
 	hw.HwRegisterEPIntHandler(0x80, &EPIntHandler);
 
-// 	printf("registerHandler: EP:OUT0Config: 64b\n");
+// 	iprintf("registerHandler: EP:OUT0Config: 64b\n");
 	hw.HwEPConfig(0x00, 64);
-// 	printf("registerHandler: EP:IN0Config: 64b\n");
+// 	iprintf("registerHandler: EP:IN0Config: 64b\n");
 	hw.HwEPConfig(0x80, 64);
-// 	printf("ctrl:init:end\n");
+// 	iprintf("ctrl:init:end\n");
 }
 
 void USBCTRL::connect() {
@@ -87,11 +87,11 @@ void USBCTRL::connect() {
 }
 
 void USBCTRL::FrameHandler(uint16_t wFrame) {
-// 	printf("F%4X\t", wFrame);
+// 	iprintf("F%4X\t", wFrame);
 }
 
 void USBCTRL::DevIntHandler(uint8_t bDevStatus) {
-// 	printf("D%02X\t", bDevStatus);
+// 	iprintf("D%02X\t", bDevStatus);
 }
 
 void USBCTRL::DataIn() {
@@ -110,6 +110,7 @@ void USBCTRL::DataIn() {
 			if (clen == 0) {
 				confIndex++;
 				confSubIndex = 0;
+// 				iprintf("Next Descriptor %d at %p is %d long!\n", confIndex, &descriptors[confIndex], descriptors[confIndex]->bLength);
 				if (descriptors[confIndex] == (usbdesc_base *) 0) {
 					confRemain = 0;
 					break;
@@ -119,6 +120,7 @@ void USBCTRL::DataIn() {
 			if (clen > irmn)
 				clen = irmn;
 			memcpy(&confBuffer[iBuf], &((uint8_t *) descriptors[confIndex])[confSubIndex], clen);
+// 			iprintf("Copied %d to %p/%p(%d), %d remains (%d this buffer)\n", clen, &confBuffer[iBuf], pbData, &confBuffer[iBuf] - pbData, confRemain - clen, irmn - clen);
 			iBuf += clen;
 			confSubIndex += clen;
 			irmn -= clen;
@@ -126,17 +128,17 @@ void USBCTRL::DataIn() {
 		}
 		iChunk = iBuf;
 	}
-	printf("W%d/%d:", iChunk, iResidue);
+// 	iprintf("W%d/%d:", iChunk, iResidue);
 	for (int i = 0; i < iChunk; i++)
-		printf("0x%02X,", pbData[i]);
-	printf("\n");
+// 		iprintf("0x%02X,", pbData[i]);
+// 	iprintf("\n");
 	hw.HwEPWrite(0x80, pbData, iChunk);
 	pbData += iChunk;
 	iResidue -= iChunk;
 }
 
 void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
-	printf("E0x%02X:0x%02X\t", bEP, bEPStatus);
+	iprintf("E0x%02X:0x%02X\t", bEP, bEPStatus);
 	if (bEP == 0x00) {
 		if (bEPStatus & EP_STATUS_SETUP) {
 			// defaults for data pointer and residue
@@ -151,12 +153,12 @@ void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
 				(REQTYPE_GET_DIR(Setup.bmRequestType) == REQTYPE_DIR_TO_HOST)) {
 				switch(REQTYPE_GET_TYPE(Setup.bmRequestType)) {
 					case REQTYPE_TYPE_STANDARD: {
-						printf("STDREQ:%02X,%02X,%04X,%04X,%04x\n", Setup.bmRequestType, Setup.bRequest, Setup.wValue, Setup.wIndex, Setup.wLength);
+						iprintf("STDREQ:%02X,%02X,%04X,%04X,%04x\n", Setup.bmRequestType, Setup.bRequest, Setup.wValue, Setup.wIndex, Setup.wLength);
 						uint8_t r = 0;
 						switch (REQTYPE_GET_RECIP(Setup.bmRequestType)) {
 							case REQTYPE_RECIP_DEVICE: {
 								r = HandleStdDeviceReq(&Setup, &iLen, &pbData);
-								printf("TS:%d\n", iLen);
+								iprintf("TS:%d\n", iLen);
 								break;
 							}
 							case REQTYPE_RECIP_INTERFACE: {
@@ -191,6 +193,7 @@ void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
 			if (iResidue > 0) {
 				// store data
 				iChunk = hw.HwEPRead(0x00, pbData, iResidue);
+				iprintf("G:%db\n", iChunk);
 				if (iChunk < 0) {
 					hw.HwEPStall(0x80, TRUE);
 					return;
@@ -201,7 +204,7 @@ void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
 					// received all, send data to handler
 					uint8_t iType = REQTYPE_GET_TYPE(Setup.bmRequestType);
 					pbData = apbDataStore[iType];
-					printf("HANDLE 0x%02X with %db\n", iType, iLen);
+					iprintf("HANDLE 0x%02X with %db\n", iType, iLen);
 // 					if (!_HandleRequest(&Setup, &iLen, &pbData)) {
 // 						DBG("_HandleRequest2 failed\n");
 // 						StallControlPipe(bEPStat);
@@ -214,6 +217,7 @@ void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
 			else {
 				// absorb zero-length status message
 				iChunk = hw.HwEPRead(0x00, NULL, 0);
+				iprintf("g%db\n", iChunk);
 // 				DBG(iChunk > 0 ? "?" : "");
 			}
 		}
@@ -257,15 +261,19 @@ uint8_t USBCTRL::GetDescriptor(uint16_t wTypeIndex, uint16_t wLangID, int *piLen
 					confSubIndex = 0;
 					*piLen = ((usbdesc_configuration *) descriptors[i])->wTotalLength;
 					*ppbData = confBuffer;
+					iprintf("Get Configuration: %d bytes!\n", *piLen);
 				}
 				else {
 					*piLen = descriptors[i]->bLength;
+					confRemain = 0;
+					iprintf("Get 0x%02X: %d bytes\n", bIndex, *piLen);
 				}
 				return TRUE;
 			}
 			iCurIndex++;
 		}
 	}
+	iprintf("Descriptor matching 0x%02X not found\n", wTypeIndex);
 // 	pab = (uint8_t *)pabDescrip;
 // 	iCurIndex = 0;
 //
@@ -410,9 +418,11 @@ uint8_t USBCTRL::SetConfiguration(uint8_t bConfigIndex, uint8_t bAltSetting) {
 uint8_t USBCTRL::HandleStdDeviceReq(TSetupPacket *pSetup, int *piLen, uint8_t **ppbData) {
 	uint8_t	*pbData = *ppbData;
 
-	switch (pSetup->bRequest) {
+	iResidue = 0;
 
+	switch (pSetup->bRequest) {
 		case REQ_GET_STATUS:
+			iprintf("GET_STATUS\n");
 			// bit 0: self-powered
 			// bit 1: remote wakeup = not supported
 			pbData[0] = 0;
@@ -421,21 +431,26 @@ uint8_t USBCTRL::HandleStdDeviceReq(TSetupPacket *pSetup, int *piLen, uint8_t **
 			break;
 
 		case REQ_SET_ADDRESS:
-			printf("USBADDR %d!\n", pSetup->wValue);
+			iprintf("USBADDR %d!\n", pSetup->wValue);
 			hw.HwSetAddress(pSetup->wValue);
+			*piLen = 0;
 			break;
 
 		case REQ_GET_DESCRIPTOR:
+			iprintf("GET DESCRIPTOR 0x%02X/0x%02X\n", GET_DESC_TYPE(pSetup->wValue), GET_DESC_INDEX(pSetup->wValue));
 // 			DBG("D%x", pSetup->wValue);
 			return GetDescriptor(pSetup->wValue, pSetup->wIndex, piLen, ppbData);
 
 		case REQ_GET_CONFIGURATION:
+			iprintf("GET CONFIGURATION\n");
 			// indicate if we are configured
 			pbData[0] = conf->bConfigurationValue;
 			*piLen = 1;
 			break;
 
 		case REQ_SET_CONFIGURATION:
+			iprintf("SET CONFIGURATION\n");
+			*piLen = 0;
 			if (!SetConfiguration(pSetup->wValue & 0xFF, bAlternate)) {
 // 				DBG("USBSetConfiguration failed!\n");
 				return FALSE;
@@ -446,6 +461,8 @@ uint8_t USBCTRL::HandleStdDeviceReq(TSetupPacket *pSetup, int *piLen, uint8_t **
 
 		case REQ_CLEAR_FEATURE:
 		case REQ_SET_FEATURE:
+			*piLen = 0;
+			iprintf("CLEAR/SET FEATURE\n");
 			if (pSetup->wValue == FEA_REMOTE_WAKEUP) {
 				// put DEVICE_REMOTE_WAKEUP code here
 			}
@@ -455,10 +472,14 @@ uint8_t USBCTRL::HandleStdDeviceReq(TSetupPacket *pSetup, int *piLen, uint8_t **
 			return FALSE;
 
 		case REQ_SET_DESCRIPTOR:
+			*piLen = 0;
+			iprintf("SET DESCRIPTOR\n");
 // 			DBG("Device req %d not implemented\n", pSetup->bRequest);
 			return FALSE;
 
 		default:
+			*piLen = 0;
+			iprintf("UNKNOWN: 0x%02X\n", pSetup->bRequest);
 // 			DBG("Illegal device req %d\n", pSetup->bRequest);
 			return FALSE;
 	}

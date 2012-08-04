@@ -106,31 +106,31 @@ void USBECM::attach(USB *u) {
 	myusb = u;
 
 	r = u->addInterface(&if0);
-		printf("ECM:if0 = %d\n", r);
+		iprintf("ECM:if0 = %d\n", r);
 
 	cdcunion.bMasterInterface = r;
 
 	r = u->addDescriptor(&cdcheader);
-		printf("ECM:head = %d\n", r);
+		iprintf("ECM:head = %d\n", r);
 	r = u->addDescriptor(&cdcunion);
-		printf("ECM:union = %d\n", r);
+		iprintf("ECM:union = %d\n", r);
 	r = u->addDescriptor(&cdcether);
-		printf("ECM:ether = %d\n", r);
+		iprintf("ECM:ether = %d\n", r);
 	r = u->addEndpoint(&notifyEP);
-		printf("ECM:notifyEP = %d\n", r);
+		iprintf("ECM:notifyEP = %d\n", r);
 	r = u->addInterface(&ifnop);
-		printf("ECM:ifnop = %d\n", r);
+		iprintf("ECM:ifnop = %d\n", r);
 	r = u->addInterface(&ifdata);
-		printf("ECM:ifdata = %d\n", r);
+		iprintf("ECM:ifdata = %d\n", r);
 
 	cdcunion.bSlaveInterface0 = r;
 
 	r = u->addEndpoint(&OutEP);
-		printf("ECM:outep = %d\n", r);
+		iprintf("ECM:outep = %d\n", r);
 	r = u->addEndpoint(&InEP);
-		printf("ECM:inep = %d\n", r);
+		iprintf("ECM:inep = %d\n", r);
 	r = u->addString(&macaddr);
-		printf("ECM:macstr = %d\n", r);
+		iprintf("ECM:macstr = %d\n", r);
 
 	cdcether.iMacAddress = r;
 }

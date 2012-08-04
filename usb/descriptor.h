@@ -117,23 +117,23 @@ typedef struct __attribute__ ((packed)) {
 } usbdesc_interface;
 
 typedef struct __attribute__ ((packed)) {
-	uint8_t	bLength;				// Endpoint Descriptor Length (0x07)
-	uint8_t	bDescType;				// DT_ENDPOINT (0x05)
-	uint8_t	bEndpointAddress;		// 0x00-0x0F = OUT endpoints, 0x80-0x8F = IN endpoints
-	uint8_t	bmAttributes;			// bitmap, see Endpoint_Attributes_Enum
+	uint8_t		bLength;				// Endpoint Descriptor Length (0x07)
+	uint8_t		bDescType;				// DT_ENDPOINT (0x05)
+	uint8_t		bEndpointAddress;		// 0x00-0x0F = OUT endpoints, 0x80-0x8F = IN endpoints
+	uint8_t		bmAttributes;			// bitmap, see Endpoint_Attributes_Enum
 	uint16_t	wMaxPacketSize;			// Maximum Packet Size this endpoint is capable of sending or receiving
-	uint8_t	bInterval;				// Interval for polling endpoint data transfers. Value in frame counts. Ignored for Bulk & Control Endpoints. Isochronous must equal 1 and field may range from 1 to 255 for interrupt endpoints.
+	uint8_t		bInterval;				// Interval for polling endpoint data transfers. Value in frame counts. Ignored for Bulk & Control Endpoints. Isochronous must equal 1 and field may range from 1 to 255 for interrupt endpoints.
 } usbdesc_endpoint;
 
 typedef struct __attribute__ ((packed)) {
-	uint8_t	bLength;				// String Descriptor Length (2 + 2*nLang)
-	uint8_t	bDescType;				// DT_STRING (0x03)
+	uint8_t		bLength;				// String Descriptor Length (2 + 2*nLang)
+	uint8_t		bDescType;				// DT_STRING (0x03)
 	uint16_t	wLangID[1];				// language code(s)
 } usbdesc_language;
 
 typedef struct __attribute__ ((packed)) {
-	uint8_t	bLength;				// 2 + strlen
-	uint8_t	bDescType;				// DT_STRING (0x03)
+	uint8_t		bLength;				// 2 + strlen
+	uint8_t		bDescType;				// DT_STRING (0x03)
 	uint16_t	str[];					// UNICODE string
 } usbdesc_string;
 

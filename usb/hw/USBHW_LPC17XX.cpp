@@ -14,9 +14,11 @@ void USBHW::init() {
 	LPC_PINCON->PINSEL4 |=  0x00040000;
 
 	// P1.18 -> USB_UP_LED
+	LPC_PINCON->PINSEL3 &= ~0x00000030;
+	LPC_PINCON->PINSEL3 |=  0x00000010;
 	// P1.30 -> VBUS
-	LPC_PINCON->PINSEL3 &= ~0x30000030;
-	LPC_PINCON->PINSEL3 |=  0x20000010;
+	LPC_PINCON->PINSEL3 &= ~0x30000000;
+	LPC_PINCON->PINSEL3 |=  0x20000000;
 
 	// P0.29 -> USB_D+
 	// P0.30 -> USB_D-
@@ -171,16 +173,16 @@ uint8_t USBHW::HwCmdRead(uint8_t bCmd) {
  *	@param [in] wMaxPSize	Maximum packet size for this endpoint
  */
 void USBHW::HwEPRealize(int idx, uint16_t wMaxPSize) {
-	printf("EP Realize %x(%x),%lx -> %lx", IDX2EP(idx), idx, LPC_USB->USBReEP, LPC_USB->USBReEP | (1 << idx));
+	iprintf("EP Realize %x(%x),%lx -> %lx", IDX2EP(idx), idx, LPC_USB->USBReEP, LPC_USB->USBReEP | (1 << idx));
 	LPC_USB->USBReEP = LPC_USB->USBReEP | (1 << idx);
-	printf(" = %lx\n", LPC_USB->USBReEP);
+	iprintf(" = %lx\n", LPC_USB->USBReEP);
 	LPC_USB->USBEpInd = idx;
 	LPC_USB->USBMaxPSize = wMaxPSize;
-	printf("EP Realize:wait %x\n", IDX2EP(idx));
+	iprintf("EP Realize:wait %x\n", IDX2EP(idx));
 	Wait4DevInt(EP_RLZED);
 // 	while ((LPC_USB->USBReEP & (1 << idx)) == 0)
-// 		printf("EP %x:%lx\n", idx, LPC_USB->USBReEP);
-	printf("EP Realize %x Complete!\n", IDX2EP(idx));
+// 		iprintf("EP %x:%lx\n", idx, LPC_USB->USBReEP);
+	iprintf("EP Realize %x Complete!\n", IDX2EP(idx));
 }
 
 
@@ -208,15 +210,15 @@ void USBHW::HwEPConfig(uint8_t bEP, uint16_t wMaxPacketSize) {
 	idx = EP2IDX(bEP);
 
 // 	DBG("EP Configure %x\n", bEP);
-	printf("EP Configure %x -> %d\n", bEP, wMaxPacketSize);
+	iprintf("EP Configure %x -> %d\n", bEP, wMaxPacketSize);
 	// realise EP
 	HwEPRealize(idx, wMaxPacketSize);
 
-	printf("EP Enable %x\n", bEP);
+	iprintf("EP Enable %x\n", bEP);
 	// enable EP
 	HwEPEnable(idx, TRUE);
 
-	printf("EP %x finished!\n", bEP);
+	iprintf("EP %x finished!\n", bEP);
 }
 
 
@@ -404,7 +406,7 @@ int USBHW::HwEPRead(uint8_t bEP, uint8_t *pbBuf, int iMaxLen) {
 	// get length
 	dwLen &= PKT_LNGTH_MASK;
 
-	// 	printf("[RDEP%02X:%lu/%d", bEP, dwLen, iMaxLen);
+	// 	iprintf("[RDEP%02X:%lu/%d", bEP, dwLen, iMaxLen);
 
 	// get data
 	dwData = 0;
@@ -420,7 +422,7 @@ int USBHW::HwEPRead(uint8_t bEP, uint8_t *pbBuf, int iMaxLen) {
 			}
 	}
 
-	// 	printf(":%d]", i + j);
+	// 	iprintf(":%d]", i + j);
 
 	// make sure RD_EN is clear
 	LPC_USB->USBCtrl = 0;
@@ -463,7 +465,7 @@ void USBHW::HwISR(void) {
 	// handle device interrupts
 	dwStatus = LPC_USB->USBDevIntSt;
 
-// 	printf("DS:%lX \t", dwStatus);
+// 	iprintf("DS:%lX \t", dwStatus);
 
 	// frame interrupt
 	if (dwStatus & FRAME) {
@@ -525,7 +527,7 @@ void USBHW::HwISR(void) {
 
 extern "C" {
 	__attribute__ ((interrupt)) void USB_IRQHandler()  {
-// 		printf("!");
+// 		iprintf("!");
 		USBHW::HwISR();
 	}
 }

@@ -18,10 +18,10 @@ OUTDIR   = build
 
 OSRC     =
 
-NXPSRC   = $(shell find CMSISv2p00_LPC17xx/ LPC17xxLib/ -name '*.c')
+NXPSRC   = $(shell find CMSISv2p00_LPC17xx/ LPC17xxLib/ nxpUSBLib/ -name '*.c')
 NXPO     = $(patsubst %.c,$(OUTDIR)/%.o,$(notdir $(NXPSRC))) $(OUTDIR)/system_LPC17xx.o
 
-CHIP     = lpc1758
+CHIP     = lpc1769
 MCU      = cortex-m3
 
 ARCH     = arm-none-eabi
@@ -41,7 +41,7 @@ RM       = rm -f
 OPTIMIZE = s
 
 #DEBUG_MESSAGES
-CDEFS    = MAX_URI_LENGTH=512 __LPC17XX__
+CDEFS    = MAX_URI_LENGTH=512 __LPC17XX__ USB_DEVICE_ONLY
 
 FLAGS    = -O$(OPTIMIZE) -mcpu=$(MCU) -mthumb -mthumb-interwork -mlong-calls -ffunction-sections -fdata-sections -Wall -g -funsigned-char -funsigned-bitfields -fpack-struct -fshort-enums
 FLAGS   += $(patsubst %,-I%,$(INC))
@@ -50,7 +50,7 @@ CFLAGS   = $(FLAGS) -std=gnu99 -pipe
 ASFLAGS  = $(FLAGS)
 CXXFLAGS = $(FLAGS) -fno-rtti -fno-exceptions -std=gnu++0x
 
-LDFLAGS  = $(FLAGS) -Wl,--as-needed,--gc-sections,-e,__cs3_reset_cortex_m,-T,lpc1758.ld
+LDFLAGS  = $(FLAGS) -Wl,--as-needed,--gc-sections,-e,__cs3_reset_cortex_m,-T,$(CHIP).ld
 LDFLAGS += $(patsubst %,-L%,$(LIBRARIES)) -lc -lstdc++
 
 OBJ      = $(patsubst %,$(OUTDIR)/%,$(notdir $(CSRC:.c=.o) $(CXXSRC:.cpp=.o) $(ASRC:.S=.o)))
@@ -61,16 +61,16 @@ VPATH    = . $(patsubst %/inc,%/src,$(INC)) $(dir $(NXPSRC)) $(dir $(USBSRC)) $(
 
 .PRECIOUS: $(OBJ)
 
-all: $(OUTDIR) $(OUTDIR)/$(PROJECT).elf $(OUTDIR)/$(PROJECT).bin $(OUTDIR)/$(PROJECT).hex size
+all: $(OUTDIR) $(OUTDIR)/nxp.ar $(OUTDIR)/$(PROJECT).elf $(OUTDIR)/$(PROJECT).bin $(OUTDIR)/$(PROJECT).hex size
 
 clean:
-	$(RM) $(OBJ) $(OUTDIR)/$(PROJECT).bin $(OUTDIR)/$(PROJECT).hex $(OUTDIR)/$(PROJECT).elf $(NXPO)
-	$(RMDIR) $(OUTDIR)
+	$(RM) $(OBJ) $(OUTDIR)/$(PROJECT).bin $(OUTDIR)/$(PROJECT).hex $(OUTDIR)/$(PROJECT).elf $(OUTDIR)/$(PROJECT).map $(NXPO) $(OBJ:%.o=%.lst) $(NXPO:%.o=%.lst) $(OUTDIR)/nxp.ar
+	$(RMDIR) $(OUTDIR); true
 
 program: $(OUTDIR)/$(PROJECT).bin
-	mount /mnt/r2c2
-	cp $< /mnt/r2c2/firmware.bin
-	eject /mnt/r2c2
+	mount /mnt/smoothie
+	cp $< /mnt/smoothie/firmware.bin
+	eject /mnt/smoothie
 upload: program
 
 size: $(OUTDIR)/$(PROJECT).elf
