@@ -16,32 +16,42 @@
 #define NULL ((void *) 0)
 #endif
 
-TSetupPacket USBCTRL::Setup;
-usbdesc_base ** USBCTRL::descriptors;
-usbdesc_device *USBCTRL::dev = (usbdesc_device *) 0;
-usbdesc_configuration *USBCTRL::conf = (usbdesc_configuration *) 0;
+// TSetupPacket USBCTRL::Setup;
+// usbdesc_base ** USBCTRL::descriptors;
+// usbdesc_device *USBCTRL::dev = (usbdesc_device *) 0;
+// usbdesc_configuration *USBCTRL::conf = (usbdesc_configuration *) 0;
 
-uint8_t USBCTRL::confBuffer[64];
-uint16_t USBCTRL::confSize;
-uint16_t USBCTRL::confRemain;
-uint8_t USBCTRL::confIndex;
-uint8_t USBCTRL::confSubIndex;
+// uint8_t USBCTRL::confBuffer[64];
+// uint16_t USBCTRL::confSize;
+// uint16_t USBCTRL::confRemain;
+// uint8_t USBCTRL::confIndex;
+// uint8_t USBCTRL::confSubIndex;
 
 // uint8_t bConfiguration;
-uint8_t USBCTRL::bAlternate;
+// uint8_t USBCTRL::bAlternate;
 
-uint8_t USBCTRL::apbDataStore[4][8] = {
-	{ 0, 0, 0, 0, 0, 0, 0, 0, },
-	{ 0, 0, 0, 0, 0, 0, 0, 0, },
-	{ 0, 0, 0, 0, 0, 0, 0, 0, },
-	{ 0, 0, 0, 0, 0, 0, 0, 0, },
-};
+// uint8_t USBCTRL::apbDataStore[4][8] = {
+// 	{ 0, 0, 0, 0, 0, 0, 0, 0, },
+// 	{ 0, 0, 0, 0, 0, 0, 0, 0, },
+// 	{ 0, 0, 0, 0, 0, 0, 0, 0, },
+// 	{ 0, 0, 0, 0, 0, 0, 0, 0, },
+// };
 
-uint8_t *USBCTRL::pbData;
-uint16_t USBCTRL::iResidue;
-int USBCTRL::iLen;
+// uint8_t *USBCTRL::pbData;
+// uint16_t USBCTRL::iResidue;
+// int USBCTRL::iLen;
 
-USBCTRL::USBCTRL() {}
+USBCTRL::USBCTRL() {
+	dev = (usbdesc_device *) 0;
+	conf = (usbdesc_configuration *) 0;
+
+	apbDataStore = {
+		{ 0, 0, 0, 0, 0, 0, 0, 0, },
+		{ 0, 0, 0, 0, 0, 0, 0, 0, },
+		{ 0, 0, 0, 0, 0, 0, 0, 0, },
+		{ 0, 0, 0, 0, 0, 0, 0, 0, },
+	};
+}
 
 void USBCTRL::init(usbdesc_base ** d) {
 	descriptors = d;
@@ -66,14 +76,14 @@ void USBCTRL::init(usbdesc_base ** d) {
 // 	confBuffer = malloc(confMaxSize);
 
 // 	iprintf("registerHandler: Frame\n");
-	hw.HwRegisterFrameHandler(&FrameHandler);
+// 	hw.HwRegisterFrameHandler(&FrameHandler);
 // 	iprintf("registerHandler: DevInt\n");
-	hw.HwRegisterDevIntHandler(&DevIntHandler);
+// 	hw.HwRegisterDevIntHandler(&DevIntHandler);
 
 // 	iprintf("registerHandler: EP:OUT0\n");
-	hw.HwRegisterEPIntHandler(0x00, &EPIntHandler);
+// 	hw.HwRegisterEPIntHandler(0x00, &EPIntHandler);
 // 	iprintf("registerHandler: EP:IN0\n");
-	hw.HwRegisterEPIntHandler(0x80, &EPIntHandler);
+// 	hw.HwRegisterEPIntHandler(0x80, &EPIntHandler);
 
 // 	iprintf("registerHandler: EP:OUT0Config: 64b\n");
 	hw.HwEPConfig(0x00, 64);
@@ -94,42 +104,46 @@ void USBCTRL::DevIntHandler(uint8_t bDevStatus) {
 // 	iprintf("D%02X\t", bDevStatus);
 }
 
+int USBCTRL::GatherConfigurationDescriptor(int iChunk) {
+	pbData = confBuffer;
+	uint8_t iBuf = 0;
+	uint8_t irmn;
+	if (iChunk > confRemain)
+		iChunk = confRemain;
+	irmn = iChunk;
+	while (irmn > 0) {
+		uint8_t clen = descriptors[confIndex]->bLength - confSubIndex;
+		if (clen == 0) {
+			confIndex++;
+			confSubIndex = 0;
+			// 				iprintf("Next Descriptor %d at %p is %d long!\n", confIndex, &descriptors[confIndex], descriptors[confIndex]->bLength);
+			if (descriptors[confIndex] == (usbdesc_base *) 0) {
+				confRemain = 0;
+				break;
+			}
+			clen = descriptors[confIndex]->bLength;
+		}
+		if (clen > irmn)
+			clen = irmn;
+		memcpy(&confBuffer[iBuf], &((uint8_t *) descriptors[confIndex])[confSubIndex], clen);
+		// 			iprintf("Copied %d to %p/%p(%d), %d remains (%d this buffer)\n", clen, &confBuffer[iBuf], pbData, &confBuffer[iBuf] - pbData, confRemain - clen, irmn - clen);
+		iBuf += clen;
+		confSubIndex += clen;
+		irmn -= clen;
+		confRemain -= clen;
+	}
+	iChunk = iBuf;
+	return iChunk;
+}
+
 void USBCTRL::DataIn() {
 	int iChunk = iResidue;
 	if (iChunk > 64)
 		iChunk = 64;
-	if (confRemain > 0) {
-		pbData = confBuffer;
-		uint8_t iBuf = 0;
-		uint8_t irmn;
-		if (iChunk > confRemain)
-			iChunk = confRemain;
-		irmn = iChunk;
-		while (irmn > 0) {
-			uint8_t clen = descriptors[confIndex]->bLength - confSubIndex;
-			if (clen == 0) {
-				confIndex++;
-				confSubIndex = 0;
-// 				iprintf("Next Descriptor %d at %p is %d long!\n", confIndex, &descriptors[confIndex], descriptors[confIndex]->bLength);
-				if (descriptors[confIndex] == (usbdesc_base *) 0) {
-					confRemain = 0;
-					break;
-				}
-				clen = descriptors[confIndex]->bLength;
-			}
-			if (clen > irmn)
-				clen = irmn;
-			memcpy(&confBuffer[iBuf], &((uint8_t *) descriptors[confIndex])[confSubIndex], clen);
-// 			iprintf("Copied %d to %p/%p(%d), %d remains (%d this buffer)\n", clen, &confBuffer[iBuf], pbData, &confBuffer[iBuf] - pbData, confRemain - clen, irmn - clen);
-			iBuf += clen;
-			confSubIndex += clen;
-			irmn -= clen;
-			confRemain -= clen;
-		}
-		iChunk = iBuf;
-	}
+	if (confRemain > 0)
+		iChunk = GatherConfigurationDescriptor(iChunk);
 // 	iprintf("W%d/%d:", iChunk, iResidue);
-	for (int i = 0; i < iChunk; i++)
+//	for (int i = 0; i < iChunk; i++)
 // 		iprintf("0x%02X,", pbData[i]);
 // 	iprintf("\n");
 	hw.HwEPWrite(0x80, pbData, iChunk);

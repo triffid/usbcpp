@@ -5,7 +5,7 @@
 
 typedef usbdesc_string_l(12) macstr_t;
 
-class USBECM {
+class USBECM : public USB_EP_Receiver {
 	USB *myusb;
 
 	usbdesc_interface		if0;
@@ -18,6 +18,9 @@ class USBECM {
 	usbdesc_endpoint		OutEP;
 	usbdesc_endpoint		InEP;
 	macstr_t				macaddr;
+
+	int EpCallback(uint8_t, uint8_t);
+
 public:
 	USBECM();
 	~USBECM();

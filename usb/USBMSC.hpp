@@ -4,10 +4,13 @@
 #include "USB.hpp"
 #include "descriptor_msc.h"
 
-class USBMSC {
+class USBMSC : public USB_EP_Receiver {
 	usbdesc_interface mscint;
 	usbdesc_endpoint epIN;
 	usbdesc_endpoint epOUT;
+
+	int EpCallback(uint8_t, uint8_t);
+
 public:
 	USBMSC();
 	~USBMSC();

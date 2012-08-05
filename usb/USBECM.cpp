@@ -44,6 +44,7 @@ USBECM::USBECM() {
 		EA_INTERRUPT,
 		8,
 		10,
+		this,
 	};
 	ifnop = {
 		DL_INTERFACE,
@@ -74,6 +75,7 @@ USBECM::USBECM() {
 		EA_BULK,
 		64,
 		0,
+		this,
 	};
 	InEP = {
 		DL_ENDPOINT,
@@ -82,6 +84,7 @@ USBECM::USBECM() {
 		EA_BULK,
 		64,
 		0,
+		this,
 	};
 	macaddr.bLength = 26;
 	macaddr.bDescType = DT_STRING;
@@ -133,4 +136,8 @@ void USBECM::attach(USB *u) {
 		iprintf("ECM:macstr = %d\n", r);
 
 	cdcether.iMacAddress = r;
+}
+
+int USBECM::EpCallback(uint8_t bEP, uint8_t bEPStatus) {
+	iprintf("[ECM] Ep %02X: %d\n", bEP, bEPStatus);
 }

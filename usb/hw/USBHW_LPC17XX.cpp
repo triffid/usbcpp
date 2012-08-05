@@ -6,7 +6,22 @@
 #include "lpc17xx_clkpwr.h"
 #include "lpc17xx_usb.h"
 
-USBHW::USBHW() {}
+USBHW *USBHW::HwPorts[1] = { (USBHW *) 0 };
+
+int USBHW::HwPortCount(void) {
+	return 1;
+}
+
+USBHW::USBHW() {
+	/** Installed device interrupt handler */
+	_pfnDevIntHandler = (TFnDevIntHandler *) NULL;
+	/** Installed frame interrupt handlers */
+	_pfnFrameHandler = (TFnFrameHandler *) NULL;
+}
+
+USBHW::USBHW(int HwPortIndex) {
+	USBHW();
+}
 
 void USBHW::init() {
 	// P2.9 -> USB_CONNECT
@@ -16,6 +31,7 @@ void USBHW::init() {
 	// P1.18 -> USB_UP_LED
 	LPC_PINCON->PINSEL3 &= ~0x00000030;
 	LPC_PINCON->PINSEL3 |=  0x00000010;
+
 	// P1.30 -> VBUS
 	LPC_PINCON->PINSEL3 &= ~0x30000000;
 	LPC_PINCON->PINSEL3 |=  0x20000000;
@@ -87,13 +103,6 @@ void USBHW::disconnect() {
 /** @file
  *	USB hardware layer
  */
-
-/** Installed device interrupt handler */
-TFnDevIntHandler *USBHW::_pfnDevIntHandler = (TFnDevIntHandler *) NULL;
-/** Installed endpoint interrupt handlers */
-TFnEPIntHandler	*USBHW::_apfnEPIntHandlers[32];
-/** Installed frame interrupt handlers */
-TFnFrameHandler	*USBHW::_pfnFrameHandler = (TFnFrameHandler *) NULL;
 
 /** convert from endpoint address to endpoint index */
 #define EP2IDX(bEP)	((((bEP)&0xF)<<1)|(((bEP)&0x80)>>7))
@@ -472,9 +481,9 @@ void USBHW::HwISR(void) {
 		// clear int
 		LPC_USB->USBDevIntClr = FRAME;
 		// call handler
-		if (_pfnFrameHandler != NULL) {
-			wFrame = HwCmdRead(CMD_DEV_READ_CUR_FRAME_NR);
-			_pfnFrameHandler(wFrame);
+		if (HwPorts[0]->_pfnFrameHandler != NULL) {
+			wFrame = HwPorts[0]->HwCmdRead(CMD_DEV_READ_CUR_FRAME_NR);
+			HwPorts[0]->_pfnFrameHandler(wFrame);
 		}
 	}
 
@@ -485,15 +494,15 @@ void USBHW::HwISR(void) {
 		 *			LPC2148 User manual revision 2, 25 july 2006.
 		 */
 		LPC_USB->USBDevIntClr = DEV_STAT;
-		bDevStat = HwCmdRead(CMD_DEV_STATUS);
+		bDevStat = HwPorts[0]->HwCmdRead(CMD_DEV_STATUS);
 		if (bDevStat & (CON_CH | SUS_CH | RST)) {
 			// convert device status into something HW independent
 			bStat = ((bDevStat & CON) ? DEV_STATUS_CONNECT : 0) |
 			((bDevStat & SUS) ? DEV_STATUS_SUSPEND : 0) |
 			((bDevStat & RST) ? DEV_STATUS_RESET : 0);
 			// call handler
-			if (_pfnDevIntHandler != NULL) {
-				_pfnDevIntHandler(bStat);
+			if (HwPorts[0]->_pfnDevIntHandler != NULL) {
+				HwPorts[0]->_pfnDevIntHandler(bStat);
 			}
 		}
 	}
@@ -508,7 +517,7 @@ void USBHW::HwISR(void) {
 			if (LPC_USB->USBEpIntSt & dwIntBit) {
 				// clear int (and retrieve status)
 				LPC_USB->USBEpIntClr = dwIntBit;
-				Wait4DevInt(CDFULL);
+				HwPorts[0]->Wait4DevInt(CDFULL);
 				bEPStat = LPC_USB->USBCmdData;
 				// convert EP pipe stat into something HW independent
 				bStat = ((bEPStat & EPSTAT_FE) ? EP_STATUS_DATA : 0) |
@@ -517,8 +526,8 @@ void USBHW::HwISR(void) {
 				((bEPStat & EPSTAT_EPN) ? EP_STATUS_NACKED : 0) |
 				((bEPStat & EPSTAT_PO) ? EP_STATUS_ERROR : 0);
 				// call handler
-				if (_apfnEPIntHandlers[i] != NULL) {
-					_apfnEPIntHandlers[i](IDX2EP(i), bStat);
+				if (HwPorts[0]->_apfnEPIntHandlers[i] != NULL) {
+					HwPorts[0]->_apfnEPIntHandlers[i](IDX2EP(i), bStat);
 				}
 			}
 		}

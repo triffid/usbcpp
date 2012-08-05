@@ -1,55 +1,61 @@
 #ifndef	_USBCTRL_HPP
 #define _USBCTRL_HPP
 
+#include "USB.hpp"
 #include "USBHW.hpp"
 
 #include "descriptor.h"
 
-class USBCTRL {
-	static USBHW hw;
-	static usbdesc_base ** descriptors;
-	static usbdesc_device *dev;
-	static usbdesc_configuration *conf;
-	static uint8_t confBuffer[];
+class USBCTRL : public USB_EP_Receiver, public USB_DevInt_Receiver, public USB_Frame_Receiver {
+	USBHW hw;
+	usbdesc_base ** descriptors;
+	usbdesc_device *dev;
+	usbdesc_configuration *conf;
+	uint8_t confBuffer[];
 
-	static uint16_t confSize;
-	static uint16_t confRemain;
-	static uint8_t confIndex;
-	static uint8_t confSubIndex;
+	uint16_t confSize;
+	uint16_t confRemain;
+	uint8_t confIndex;
+	uint8_t confSubIndex;
 
-	static uint8_t *pbData;
-	static uint16_t iResidue;
-	static int iLen;
+	uint8_t *pbData;
+	uint16_t iResidue;
+	int iLen;
 
-	static uint8_t apbDataStore[4][8];
+	uint8_t apbDataStore[4][8];
 
-	static const uint8_t *pabDescrip;
-	static uint8_t bConfiguration;
-	static uint8_t bAlternate;
+	const uint8_t *pabDescrip;
+	uint8_t bConfiguration;
+	uint8_t bAlternate;
 
-	static TFnHandleRequest	*pfnHandleCustomReq;
-	static TSetupPacket Setup;
+	TFnHandleRequest	*pfnHandleCustomReq;
+	TSetupPacket Setup;
 
-	static void FrameHandler(uint16_t);
-	static void DevIntHandler(uint8_t bDevStatus);
-	static void EPIntHandler(uint8_t bEP, uint8_t bEPStatus);
+	void FrameHandler(uint16_t);
+	void DevIntHandler(uint8_t bDevStatus);
+	void EPIntHandler(uint8_t bEP, uint8_t bEPStatus);
 
-	static uint8_t HandleStdDeviceReq(TSetupPacket *pSetup, int *piLen, uint8_t **ppbData);
-	static uint8_t HandleStdInterfaceReq(TSetupPacket	*pSetup, int *piLen, uint8_t **ppbData);
-	static uint8_t HandleStdEndPointReq(TSetupPacket	*pSetup, int *piLen, uint8_t **ppbData);
-	static uint8_t HandleStandardRequest(TSetupPacket	*pSetup, int *piLen, uint8_t **ppbData);
+	uint8_t HandleStdDeviceReq(TSetupPacket *pSetup, int *piLen, uint8_t **ppbData);
+	uint8_t HandleStdInterfaceReq(TSetupPacket	*pSetup, int *piLen, uint8_t **ppbData);
+	uint8_t HandleStdEndPointReq(TSetupPacket	*pSetup, int *piLen, uint8_t **ppbData);
+	uint8_t HandleStandardRequest(TSetupPacket	*pSetup, int *piLen, uint8_t **ppbData);
 
-	static uint8_t GetDescriptor(uint16_t wTypeIndex, uint16_t wLangID, int *piLen, uint8_t **ppbData);
+	uint8_t GetDescriptor(uint16_t wTypeIndex, uint16_t wLangID, int *piLen, uint8_t **ppbData);
 
-	static uint8_t SetConfiguration(uint8_t bConfigIndex, uint8_t bAltSetting);
+	uint8_t SetConfiguration(uint8_t bConfigIndex, uint8_t bAltSetting);
 
-	static void DataIn(void);
+	int GatherConfigurationDescriptor(int);
+	void DataIn(void);
+
+	int EpCallback(uint8_t, uint8_t);
+	int DevIntCallback(uint8_t bDevStatus);
+	int FrameCallback(uint16_t);
 
 public:
 	USBCTRL();
-	static void init(usbdesc_base **);
+	void init(usbdesc_base **);
 
-	static void connect(void);
+	void connect(void);
 };
 
 #endif /* _USBCTRL_HPP */

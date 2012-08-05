@@ -1,5 +1,7 @@
 #include "USBMSC.hpp"
 
+#include <cstdio>
+
 USBMSC::USBMSC() {
 	mscint.bLength				= DL_INTERFACE;
 	mscint.bDescType			= DT_INTERFACE;
@@ -36,4 +38,8 @@ void USBMSC::attach(USB *u) {
 	u->addInterface(&mscint);
 	u->addEndpoint(&epOUT);
 	u->addEndpoint(&epIN);
+}
+
+int USBMSC::EpCallback(uint8_t bEP, uint8_t bEPStatus) {
+	iprintf("[MSC] Ep %02X: %d\n", bEP, bEPStatus);
 }

@@ -7,14 +7,26 @@
 #define N_DESCRIPTORS 32
 #endif
 
-#include "USBCTRL.hpp"
-
-typedef void (*epCallback_f)(uint8_t, uint8_t);
+// typedef void (*epCallback_f)(uint8_t, uint8_t);
 
 class USB_EP_Receiver {
 public:
 	int EpCallback(uint8_t, uint8_t);
 };
+
+class USB_DevInt_Receiver {
+public:
+	int DevIntCallback(uint8_t bDevStatus);
+};
+
+class USB_Frame_Receiver {
+public:
+	int FrameCallback(uint16_t wFrame);
+};
+
+#include "USBCTRL.hpp"
+
+class USBCTRL;
 
 class USB {
 	static USBCTRL ctrl;

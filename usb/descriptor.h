@@ -69,7 +69,7 @@
 #define SL_AUENGLISH                0x0C09
 #define SL_GERMAN                   0x0407
 
-
+class USB_EP_Receiver;
 
 typedef struct {
 	uint8_t		bLength;			// descriptor length
@@ -123,6 +123,7 @@ typedef struct __attribute__ ((packed)) {
 	uint8_t		bmAttributes;			// bitmap, see Endpoint_Attributes_Enum
 	uint16_t	wMaxPacketSize;			// Maximum Packet Size this endpoint is capable of sending or receiving
 	uint8_t		bInterval;				// Interval for polling endpoint data transfers. Value in frame counts. Ignored for Bulk & Control Endpoints. Isochronous must equal 1 and field may range from 1 to 255 for interrupt endpoints.
+	USB_EP_Receiver *callbackReceiver;	// Who do we call when something happens on this endpoint?
 } usbdesc_endpoint;
 
 typedef struct __attribute__ ((packed)) {

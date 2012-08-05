@@ -3,7 +3,7 @@
 
 #include "USB.hpp"
 
-class USBCDC {
+class USBCDC : public USB_EP_Receiver {
 	usbdesc_interface   usbif;
 	usbcdc_header       cdcheader;
 	usbcdc_callmgmt     cmgmt;
@@ -21,6 +21,8 @@ class USBCDC {
 	uint8_t slaveIfAddr;
 	uint8_t EpOutAddr;
 	uint8_t EpInAddr;
+
+	int EpCallback(uint8_t, uint8_t);
 
 public:
 	USBCDC();
