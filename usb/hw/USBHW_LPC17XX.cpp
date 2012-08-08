@@ -14,9 +14,11 @@ int USBHW::HwPortCount(void) {
 
 USBHW::USBHW() {
 	/** Installed device interrupt handler */
-	_pfnDevIntHandler = (TFnDevIntHandler *) NULL;
+// 	_pfnDevIntHandler = (TFnDevIntHandler *) NULL;
 	/** Installed frame interrupt handlers */
-	_pfnFrameHandler = (TFnFrameHandler *) NULL;
+// 	_pfnFrameHandler = (TFnFrameHandler *) NULL;
+
+	HwPorts[0] = this;
 }
 
 USBHW::USBHW(int HwPortIndex) {
@@ -24,6 +26,7 @@ USBHW::USBHW(int HwPortIndex) {
 }
 
 void USBHW::init() {
+	iprintf("Hw.init (%p)\n", HwPorts[0]);
 	// P2.9 -> USB_CONNECT
 	LPC_PINCON->PINSEL4 &= ~0x000C0000;
 	LPC_PINCON->PINSEL4 |=  0x00040000;
@@ -62,9 +65,11 @@ void USBHW::init() {
 	NVIC_EnableIRQ(USB_IRQn);
 
 // 	LPC_USB->USBDevIntEn |= FRAME | DEV_STAT | EP_SLOW;
+	iprintf("Hw.init ok\n");
 }
 
 void USBHW::connect() {
+	iprintf("HW.connect\n");
 	HwConnect(TRUE);
 }
 
@@ -103,11 +108,6 @@ void USBHW::disconnect() {
 /** @file
  *	USB hardware layer
  */
-
-/** convert from endpoint address to endpoint index */
-#define EP2IDX(bEP)	((((bEP)&0xF)<<1)|(((bEP)&0x80)>>7))
-/** convert from endpoint index to endpoint address */
-#define IDX2EP(idx)	((((idx)<<7)&0x80)|(((idx)>>1)&0xF))
 
 /**
  *	Local function to wait for a device interrupt (and clear it)
@@ -169,6 +169,21 @@ uint8_t USBHW::HwCmdRead(uint8_t bCmd) {
 	return LPC_USB->USBCmdData;
 }
 
+uint16_t USBHW::HwCmdRead16(uint8_t bCmd) {
+	uint16_t r = 0;
+	// write command code
+	HwCmd(bCmd);
+
+	// get data - LSB
+	LPC_USB->USBCmdCode = 0x00000200 | (bCmd << 16);
+	Wait4DevInt(CDFULL);
+	r = LPC_USB->USBCmdData;
+
+	// get data - MSB
+	LPC_USB->USBCmdCode = 0x00000200 | (bCmd << 16);
+	Wait4DevInt(CDFULL);
+	return r | (LPC_USB->USBCmdData << 8);
+}
 
 /**
  *	'Realizes' an endpoint, meaning that buffer space is reserved for
@@ -227,6 +242,9 @@ void USBHW::HwEPConfig(uint8_t bEP, uint16_t wMaxPacketSize) {
 	// enable EP
 	HwEPEnable(idx, TRUE);
 
+	LPC_USB->USBEpIntEn  |= (1 << idx);
+	LPC_USB->USBDevIntEn |= EP_SLOW;
+
 	iprintf("EP %x finished!\n", bEP);
 }
 
@@ -237,22 +255,22 @@ void USBHW::HwEPConfig(uint8_t bEP, uint16_t wMaxPacketSize) {
  *	@param [in]	bEP				Endpoint number
  *	@param [in]	pfnHandler		Callback function
  */
-void USBHW::HwRegisterEPIntHandler(uint8_t bEP, TFnEPIntHandler *pfnHandler) {
-	int idx;
-
-	idx = EP2IDX(bEP);
-
-// 	ASSERT(idx<32);
-
-	/* add handler to list of EP handlers */
-	_apfnEPIntHandlers[idx] = pfnHandler;
-
-	/* enable EP interrupt */
-	LPC_USB->USBEpIntEn |= (1 << idx);
-	LPC_USB->USBDevIntEn |= EP_SLOW;
-
-// 	DBG("Registered handler for EP 0x%x\n", bEP);
-}
+// void USBHW::HwRegisterEPIntHandler(uint8_t bEP, TFnEPIntHandler *pfnHandler) {
+// 	int idx;
+//
+// 	idx = EP2IDX(bEP);
+//
+// // 	ASSERT(idx<32);
+//
+// 	/* add handler to list of EP handlers */
+// 	_apfnEPIntHandlers[idx] = pfnHandler;
+//
+// 	/* enable EP interrupt */
+// 	LPC_USB->USBEpIntEn |= (1 << idx);
+// 	LPC_USB->USBDevIntEn |= EP_SLOW;
+//
+// // 	DBG("Registered handler for EP 0x%x\n", bEP);
+// }
 
 
 /**
@@ -260,14 +278,14 @@ void USBHW::HwRegisterEPIntHandler(uint8_t bEP, TFnEPIntHandler *pfnHandler) {
  *
  *	@param [in]	pfnHandler	Callback function
  */
-void USBHW::HwRegisterDevIntHandler(TFnDevIntHandler *pfnHandler) {
-	_pfnDevIntHandler = pfnHandler;
-
-	// enable device interrupt
-	LPC_USB->USBDevIntEn |= DEV_STAT;
-
-// 	DBG("Registered handler for device status\n");
-}
+// void USBHW::HwRegisterDevIntHandler(TFnDevIntHandler *pfnHandler) {
+// 	_pfnDevIntHandler = pfnHandler;
+//
+// 	// enable device interrupt
+// 	LPC_USB->USBDevIntEn |= DEV_STAT;
+//
+// // 	DBG("Registered handler for device status\n");
+// }
 
 
 /**
@@ -275,14 +293,14 @@ void USBHW::HwRegisterDevIntHandler(TFnDevIntHandler *pfnHandler) {
  *
  *	@param [in]	pfnHandler	Callback function
  */
-void USBHW::HwRegisterFrameHandler(TFnFrameHandler *pfnHandler) {
-	_pfnFrameHandler = pfnHandler;
-
-	// enable device interrupt
-	LPC_USB->USBDevIntEn |= FRAME;
-
-// 	DBG("Registered handler for frame\n");
-}
+// void USBHW::HwRegisterFrameHandler(TFnFrameHandler *pfnHandler) {
+// 	_pfnFrameHandler = pfnHandler;
+//
+// 	// enable device interrupt
+// 	LPC_USB->USBDevIntEn |= FRAME;
+//
+// // 	DBG("Registered handler for frame\n");
+// }
 
 
 /**
@@ -301,6 +319,7 @@ void USBHW::HwSetAddress(uint8_t bAddr) {
  *	@param [in]	fConnect	If TRUE, connect, otherwise disconnect
  */
 void USBHW::HwConnect(uint8_t fConnect) {
+	iprintf("HwConnect %d\n", fConnect);
 	HwCmdWrite(CMD_DEV_STATUS, fConnect ? CON : 0);
 }
 
@@ -454,6 +473,7 @@ int USBHW::HwEPRead(uint8_t bEP, uint8_t *pbBuf, int iMaxLen) {
  */
 void USBHW::HwConfigDevice(uint8_t fConfigured) {
 	// set configured bit
+	iprintf("CONF:%d\n", fConfigured?1:0);
 	HwCmdWrite(CMD_DEV_CONFIG, fConfigured ? CONF_DEVICE : 0);
 }
 
@@ -481,10 +501,14 @@ void USBHW::HwISR(void) {
 		// clear int
 		LPC_USB->USBDevIntClr = FRAME;
 		// call handler
-		if (HwPorts[0]->_pfnFrameHandler != NULL) {
-			wFrame = HwPorts[0]->HwCmdRead(CMD_DEV_READ_CUR_FRAME_NR);
-			HwPorts[0]->_pfnFrameHandler(wFrame);
+		if (HwPorts[0] != NULL) {
+			wFrame = HwPorts[0]->HwCmdRead16(CMD_DEV_READ_CUR_FRAME_NR);
+// 			HwPorts[0]->_pfnFrameHandler(wFrame);
+// 			iprintf("Frame %d (%p)\n", wFrame, HwPorts[0]);
+			HwPorts[0]->FrameHandler(wFrame);
+// 			iprintf("Frame %d OK\n", wFrame);
 		}
+		dwStatus &= ~(FRAME);
 	}
 
 	// device status interrupt
@@ -498,23 +522,27 @@ void USBHW::HwISR(void) {
 		if (bDevStat & (CON_CH | SUS_CH | RST)) {
 			// convert device status into something HW independent
 			bStat = ((bDevStat & CON) ? DEV_STATUS_CONNECT : 0) |
-			((bDevStat & SUS) ? DEV_STATUS_SUSPEND : 0) |
-			((bDevStat & RST) ? DEV_STATUS_RESET : 0);
+			        ((bDevStat & SUS) ? DEV_STATUS_SUSPEND : 0) |
+			        ((bDevStat & RST) ? DEV_STATUS_RESET   : 0);
 			// call handler
-			if (HwPorts[0]->_pfnDevIntHandler != NULL) {
-				HwPorts[0]->_pfnDevIntHandler(bStat);
-			}
+// 			if (HwPorts[0]->_pfnDevIntHandler != NULL) {
+// 				HwPorts[0]->_pfnDevIntHandler(bStat);
+// 			}
+			HwPorts[0]->DevIntHandler(bStat);
 		}
+		dwStatus &= ~(DEV_STAT);
 	}
 
 	// endpoint interrupt
 	if (dwStatus & EP_SLOW) {
+		iprintf("EP\n");
 		// clear EP_SLOW
 		LPC_USB->USBDevIntClr = EP_SLOW;
 		// check all endpoints
 		for (i = 0; i < 32; i++) {
 			dwIntBit = (1 << i);
 			if (LPC_USB->USBEpIntSt & dwIntBit) {
+				iprintf("%d ", i);
 				// clear int (and retrieve status)
 				LPC_USB->USBEpIntClr = dwIntBit;
 				HwPorts[0]->Wait4DevInt(CDFULL);
@@ -526,17 +554,63 @@ void USBHW::HwISR(void) {
 				((bEPStat & EPSTAT_EPN) ? EP_STATUS_NACKED : 0) |
 				((bEPStat & EPSTAT_PO) ? EP_STATUS_ERROR : 0);
 				// call handler
-				if (HwPorts[0]->_apfnEPIntHandlers[i] != NULL) {
-					HwPorts[0]->_apfnEPIntHandlers[i](IDX2EP(i), bStat);
-				}
+// 				if (HwPorts[0]->_apfnEPIntHandlers[i] != NULL) {
+// 					HwPorts[0]->_apfnEPIntHandlers[i](IDX2EP(i), bStat);
+// 				}
+				HwPorts[0]->EPIntHandler(IDX2EP(i), bStat);
 			}
 		}
+		iprintf("\n");
+		dwStatus &= ~(EP_SLOW);
 	}
+
+	if (dwStatus & ERR_INT) {
+		uint8_t err = HwPorts[0]->HwCmdRead(CMD_DEV_READ_ERROR_STATUS);
+		iprintf("USB Error: %d\n", err);
+		if (err & PID_ERR)
+			iprintf("\tPID or bad CRC\n");
+		if (err & UEPKT)
+			iprintf("\tUnexpected Packet\n");
+		if (err & DCRC)
+			iprintf("\tData CRC\n");
+		if (err & TIMEOUT)
+			iprintf("\tTimeout\n");
+		if (err & EOP)
+			iprintf("\tEnd of Packet\n");
+		if (err & B_OVRN)
+			iprintf("\tBuffer Overrun\n");
+		if (err & BTSTF)
+			iprintf("\tBit Stuffing Error\n");
+		if (err & TGL_ERR)
+			iprintf("\tWrong toggle bit in USB packet\n");
+		dwStatus &= ~(ERR_INT);
+	}
+
+	printf("dwStatus: %ld\n", dwStatus);
+}
+
+void USBHW::FrameHandler(uint16_t wFrame) {
+	iprintf("HW:FrameHandler!\n"); // override me!
+	HwConnect(false);
+}
+
+void USBHW::DevIntHandler(uint8_t bStatus) {
+	iprintf("HW:DevIntHandler!\n"); // override me!
+	HwConnect(false);
+}
+
+void USBHW::EPIntHandler(uint8_t bEP, uint8_t bEpStatus) {
+	iprintf("HW:EPIntHandler!\n"); // override me!
+	HwConnect(false);
 }
 
 extern "C" {
 	__attribute__ ((interrupt)) void USB_IRQHandler()  {
-// 		iprintf("!");
+		iprintf("!");
 		USBHW::HwISR();
 	}
+// 	__attribute__ ((interrupt)) void USBActivity_IRQHandler()  {
+// 		iprintf("!");
+// 		USBHW::HwISR();
+// 	}
 }

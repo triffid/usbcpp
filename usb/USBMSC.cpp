@@ -40,6 +40,6 @@ void USBMSC::attach(USB *u) {
 	u->addEndpoint(&epIN);
 }
 
-int USBMSC::EpCallback(uint8_t bEP, uint8_t bEPStatus) {
+void USBMSC::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
 	iprintf("[MSC] Ep %02X: %d\n", bEP, bEPStatus);
 }

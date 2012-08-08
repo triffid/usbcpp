@@ -9,7 +9,7 @@ class USBMSC : public USB_EP_Receiver {
 	usbdesc_endpoint epIN;
 	usbdesc_endpoint epOUT;
 
-	int EpCallback(uint8_t, uint8_t);
+	void EPIntHandler(uint8_t, uint8_t);
 
 public:
 	USBMSC();

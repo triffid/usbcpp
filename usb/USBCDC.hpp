@@ -22,7 +22,7 @@ class USBCDC : public USB_EP_Receiver {
 	uint8_t EpOutAddr;
 	uint8_t EpInAddr;
 
-	int EpCallback(uint8_t, uint8_t);
+	void EPIntHandler(uint8_t, uint8_t);
 
 public:
 	USBCDC();

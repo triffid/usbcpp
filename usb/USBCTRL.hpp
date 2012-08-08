@@ -1,16 +1,18 @@
 #ifndef	_USBCTRL_HPP
 #define _USBCTRL_HPP
 
-#include "USB.hpp"
 #include "USBHW.hpp"
 
 #include "descriptor.h"
 
-class USBCTRL : public USB_EP_Receiver, public USB_DevInt_Receiver, public USB_Frame_Receiver {
-	USBHW hw;
+class USBCTRL : public USBHW {
+// 	USBHW hw;
 	usbdesc_base ** descriptors;
 	usbdesc_device *dev;
 	usbdesc_configuration *conf;
+
+	USB_EP_Receiver *EpHolders[16];
+
 	uint8_t confBuffer[];
 
 	uint16_t confSize;
@@ -47,15 +49,15 @@ class USBCTRL : public USB_EP_Receiver, public USB_DevInt_Receiver, public USB_F
 	int GatherConfigurationDescriptor(int);
 	void DataIn(void);
 
-	int EpCallback(uint8_t, uint8_t);
-	int DevIntCallback(uint8_t bDevStatus);
-	int FrameCallback(uint16_t);
+	uint16_t lastFrameNumber;
 
 public:
 	USBCTRL();
 	void init(usbdesc_base **);
 
 	void connect(void);
+
+	uint16_t lastFrame(void);
 };
 
 #endif /* _USBCTRL_HPP */

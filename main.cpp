@@ -74,6 +74,7 @@ int main(void) {
 // 	int l = 0;
 
 	while (1) {
+		u.USBHW::HwISR();
 		if (sysclock.poll()) {
 // 			iprintf("-------------------\n");
 // 			iprintf("USBClkCtrl:   0x%8lX\n", LPC_USB->USBClkCtrl);
@@ -82,6 +83,7 @@ int main(void) {
 // 			iprintf("USBDevIntSt:  0x%8lX\n", LPC_USB->USBDevIntSt);
 // 			iprintf("USBDevIntEn:  0x%8lX\n", LPC_USB->USBDevIntEn);
 // 			iprintf("USBDevIntPri: 0x%8lX\n", LPC_USB->USBDevIntPri);
+			iprintf("Fr: %d\n", u.USBCTRL::lastFrame());
 		}
 		w.feed();
 // 		l++;
@@ -94,5 +96,26 @@ extern "C" {
 	int _write(int fd, uint8_t *buf, size_t buflen) {
 		dbg.send((uint8_t *) buf, buflen);
 		return buflen;
+	}
+
+	void NMI_Handler() {
+		iprintf("NMI\n");
+		for (;;);
+	}
+	void HardFault_Handler() {
+		iprintf("HardFault\n");
+		for (;;);
+	}
+	void MemManage_Handler() {
+		iprintf("MemManage\n");
+		for (;;);
+	}
+	void BusFault_Handler() {
+		iprintf("BusFault\n");
+		for (;;);
+	}
+	void UsageFault_Handler() {
+		iprintf("UsageFault\n");
+		for (;;);
 	}
 }

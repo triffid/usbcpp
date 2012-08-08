@@ -44,6 +44,7 @@ USBECM::USBECM() {
 		EA_INTERRUPT,
 		8,
 		10,
+		0,
 		this,
 	};
 	ifnop = {
@@ -75,6 +76,7 @@ USBECM::USBECM() {
 		EA_BULK,
 		64,
 		0,
+		0,
 		this,
 	};
 	InEP = {
@@ -83,6 +85,7 @@ USBECM::USBECM() {
 		EP_DIR_IN,
 		EA_BULK,
 		64,
+		0,
 		0,
 		this,
 	};
@@ -138,6 +141,6 @@ void USBECM::attach(USB *u) {
 	cdcether.iMacAddress = r;
 }
 
-int USBECM::EpCallback(uint8_t bEP, uint8_t bEPStatus) {
+void USBECM::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
 	iprintf("[ECM] Ep %02X: %d\n", bEP, bEPStatus);
 }

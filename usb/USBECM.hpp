@@ -19,7 +19,7 @@ class USBECM : public USB_EP_Receiver {
 	usbdesc_endpoint		InEP;
 	macstr_t				macaddr;
 
-	int EpCallback(uint8_t, uint8_t);
+	void EPIntHandler(uint8_t, uint8_t);
 
 public:
 	USBECM();

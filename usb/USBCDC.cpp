@@ -52,6 +52,7 @@ USBCDC::USBCDC() {
 		EA_INTERRUPT,
 		8,
 		16,
+		0,
 		this,
 	};
 
@@ -62,6 +63,7 @@ USBCDC::USBCDC() {
 		EA_BULK,	// .bmAttributes
 		64,			// .wMaxPacketSize
 		0,			// .bInterval
+		0,
 		this,
 	};
 
@@ -72,6 +74,7 @@ USBCDC::USBCDC() {
 		EA_BULK,	// .bmAttributes
 		64,			// .wMaxPacketSize
 		0,			// .bInterval
+		0,
 		this,
 	};
 }
@@ -97,6 +100,6 @@ void USBCDC::attach(USB *usb) {
 	cdcunion.bMasterInterface = IfAddr;
 }
 
-int USBCDC::EpCallback(uint8_t bEP, uint8_t bEPStatus) {
+void USBCDC::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
 	iprintf("[CDC] Ep %02X: %d\n", bEP, bEPStatus);
 }

@@ -2,13 +2,13 @@
 
 #include <cstdio>
 
-USBCTRL USB::ctrl;
+// USBCTRL USB::ctrl;
 usbdesc_base *USB::descriptors[N_DESCRIPTORS];
 
 usbdesc_device USB::device = {
 	DL_DEVICE,
 	DT_DEVICE,
-	USB_VERSION_2_0,	// .bcdUSB
+	USB_VERSION_1_1,	// .bcdUSB
 	UC_PER_INTERFACE,	// .bDeviceClass
 	0,					// .bDeviceSubClass
 	0,					// .bDeviceProtocol
@@ -80,11 +80,11 @@ USB::USB() {
 }
 
 void USB::init() {
-	iprintf("ctrl.init\n");
-	ctrl.init(descriptors);
+	iprintf("init\n");
+	USBCTRL::init(descriptors);
 
-	iprintf("OK\nctrl.connect\n");
- 	ctrl.connect();
+	iprintf("OK\nconnect\n");
+ 	connect();
 	iprintf("OK");
 }
 
