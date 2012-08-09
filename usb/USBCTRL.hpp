@@ -13,7 +13,7 @@ class USBCTRL : public USBHW {
 
 	USB_EP_Receiver *EpHolders[16];
 
-	uint8_t confBuffer[];
+	uint8_t confBuffer[64];
 
 	uint16_t confSize;
 	uint16_t confRemain;

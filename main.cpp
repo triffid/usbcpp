@@ -74,7 +74,7 @@ int main(void) {
 // 	int l = 0;
 
 	while (1) {
-		u.USBHW::HwISR();
+// 		u.USBHW::HwISR();
 		if (sysclock.poll()) {
 // 			iprintf("-------------------\n");
 // 			iprintf("USBClkCtrl:   0x%8lX\n", LPC_USB->USBClkCtrl);

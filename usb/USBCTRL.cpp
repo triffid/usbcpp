@@ -129,6 +129,7 @@ void USBCTRL::DevIntHandler(uint8_t bDevStatus) {
 }
 
 int USBCTRL::GatherConfigurationDescriptor(int iChunk) {
+	iprintf("Gathering Configuration\n");
 	pbData = confBuffer;
 	uint8_t iBuf = 0;
 	uint8_t irmn;
@@ -170,7 +171,9 @@ void USBCTRL::DataIn() {
 //	for (int i = 0; i < iChunk; i++)
 // 		iprintf("0x%02X,", pbData[i]);
 // 	iprintf("\n");
+	iprintf("EP0x80:Wr %d of %d (%p), %d rmn...", iChunk, iResidue, pbData, iResidue - iChunk);
 	HwEPWrite(0x80, pbData, iChunk);
+	iprintf("complete\n");
 	pbData += iChunk;
 	iResidue -= iChunk;
 }
@@ -191,27 +194,32 @@ void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
 				(REQTYPE_GET_DIR(Setup.bmRequestType) == REQTYPE_DIR_TO_HOST)) {
 				switch(REQTYPE_GET_TYPE(Setup.bmRequestType)) {
 					case REQTYPE_TYPE_STANDARD: {
-						iprintf("STDREQ:%02X,%02X,%04X,%04X,%04x\n", Setup.bmRequestType, Setup.bRequest, Setup.wValue, Setup.wIndex, Setup.wLength);
+// 						iprintf("STDREQ:%02X,%02X,%04X,%04X,%04x\n", Setup.bmRequestType, Setup.bRequest, Setup.wValue, Setup.wIndex, Setup.wLength);
 						uint8_t r = 0;
 						switch (REQTYPE_GET_RECIP(Setup.bmRequestType)) {
 							case REQTYPE_RECIP_DEVICE: {
+								iprintf("StdDevReq:Rq=%02x,wV=%02x,wI=%02x,wL=%02x\n", Setup.bRequest, Setup.wValue, Setup.wIndex, Setup.wLength);
 								r = HandleStdDeviceReq(&Setup, &iLen, &pbData);
-								iprintf("TS:%d\n", iLen);
+								iprintf("Reply:%d bytes, max this packet: %d\n", iLen, Setup.wLength);
 								break;
 							}
 							case REQTYPE_RECIP_INTERFACE: {
+								iprintf("StdIntReq:Rq=%02x,wV=%02x,wI=%02x,wL=%02x\n", Setup.bRequest, Setup.wValue, Setup.wIndex, Setup.wLength);
 								r = HandleStdInterfaceReq(&Setup, &iLen, &pbData);
 								break;
 							}
 							case REQTYPE_RECIP_ENDPOINT: {
+								iprintf("StdEPReq:Rq=%02x,wV=%02x,wI=%02x,wL=%02x\n", Setup.bRequest, Setup.wValue, Setup.wIndex, Setup.wLength);
 								r = HandleStdEndPointReq(&Setup, &iLen, &pbData);
 								break;
 							}
 							case REQTYPE_RECIP_OTHER: {
+								iprintf("StdReq?:RqType=%02x;Rq=%02x,wV=%02x,wI=%02x,wL=%02x\n", Setup.bmRequestType, Setup.bRequest, Setup.wValue, Setup.wIndex, Setup.wLength);
 								break;
 							}
 						}
 						if (!r) {
+							iprintf("STALL!\n");
 							HwEPStall(0x80, TRUE);
 							return;
 						}
@@ -222,8 +230,14 @@ void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
 						DataIn();
 
 						break;
-					}
+					};
+					default: {
+						iprintf("Unknown Setup ReqType %d - ignored\n", Setup.bmRequestType);
+					};
 				}
+			}
+			else {
+				iprintf("Setup Packet: wL=%d, ReqType=%02X - ignored\n", Setup.wLength, Setup.bmRequestType);
 			}
 		}
 		else {
@@ -261,6 +275,7 @@ void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
 		}
 	}
 	else if (bEP == 0x80) {
+
 		DataIn();
 	}
 }

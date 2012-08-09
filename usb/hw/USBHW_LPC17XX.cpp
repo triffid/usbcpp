@@ -535,7 +535,7 @@ void USBHW::HwISR(void) {
 
 	// endpoint interrupt
 	if (dwStatus & EP_SLOW) {
-		iprintf("EP\n");
+		iprintf("EP 0x%08X\n", LPC_USB->USBEpIntSt);
 		// clear EP_SLOW
 		LPC_USB->USBDevIntClr = EP_SLOW;
 		// check all endpoints
@@ -560,13 +560,14 @@ void USBHW::HwISR(void) {
 				HwPorts[0]->EPIntHandler(IDX2EP(i), bStat);
 			}
 		}
-		iprintf("\n");
+// 		iprintf("\n");
 		dwStatus &= ~(EP_SLOW);
 	}
 
 	if (dwStatus & ERR_INT) {
 		uint8_t err = HwPorts[0]->HwCmdRead(CMD_DEV_READ_ERROR_STATUS);
-		iprintf("USB Error: %d\n", err);
+		if (err)
+			iprintf("USB Error: %d\n", err);
 		if (err & PID_ERR)
 			iprintf("\tPID or bad CRC\n");
 		if (err & UEPKT)
@@ -583,10 +584,76 @@ void USBHW::HwISR(void) {
 			iprintf("\tBit Stuffing Error\n");
 		if (err & TGL_ERR)
 			iprintf("\tWrong toggle bit in USB packet\n");
+
+		err = HwPorts[0]->HwCmdRead(CMD_DEV_GET_ERROR_CODE);
+		if (err)
+			iprintf("Error Code: %d\n", err);
+		switch(err & 0xF) {
+			case 1: {
+				iprintf("PID Encoding Error\n");
+				break;
+			};
+			case 2: {
+				iprintf("Unknown PID\n");
+				break;
+			};
+			case 3: {
+				iprintf("Unexpected Packet\n");
+				break;
+			};
+			case 4: {
+				iprintf("Token CRC Error\n");
+				break;
+			};
+			case 5: {
+				iprintf("Data CRC Error\n");
+				break;
+			};
+			case 6: {
+				iprintf("Timeout\n");
+				break;
+			};
+			case 7: {
+				iprintf("Babble\n");
+				break;
+			};
+			case 8: {
+				iprintf("EOP Error\n");
+				break;
+			};
+			case 9: {
+				iprintf("Send/Recv NAK\n");
+				break;
+			};
+			case 10: {
+				iprintf("Stall\n");
+				break;
+			};
+			case 11: {
+				iprintf("Buffer Overrun\n");
+				break;
+			};
+			case 12: {
+				iprintf("Sent Empty Packet (ISO EP)\n");
+				break;
+			};
+			case 13: {
+				iprintf("Bitstuff\n");
+				break;
+			};
+			case 14: {
+				iprintf("Sync Error\n");
+				break;
+			};
+			case 15: {
+				iprintf("Data Wrong Toggle\n");
+				break;
+			};
+		}
 		dwStatus &= ~(ERR_INT);
 	}
 
-	printf("dwStatus: %ld\n", dwStatus);
+// 	printf("dwStatus: %ld\n", dwStatus);
 }
 
 void USBHW::FrameHandler(uint16_t wFrame) {
