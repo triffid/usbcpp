@@ -11,7 +11,7 @@ class USBCTRL : public USBHW {
 	usbdesc_device *dev;
 	usbdesc_configuration *conf;
 
-	USB_EP_Receiver *EpHolders[16];
+// 	USB_EP_Receiver *EpHolders[16];
 
 	uint8_t confBuffer[64];
 
@@ -33,9 +33,10 @@ class USBCTRL : public USBHW {
 	TFnHandleRequest	*pfnHandleCustomReq;
 	TSetupPacket Setup;
 
-	void FrameHandler(uint16_t);
-	void DevIntHandler(uint8_t bDevStatus);
-	void EPIntHandler(uint8_t bEP, uint8_t bEPStatus);
+	void FrameHandler(USBHW *, uint16_t);
+	void DevIntHandler(USBHW *, uint8_t bDevStatus);
+	void EPIntHandler(USBHW *, uint8_t bEP, uint8_t bEPStatus);
+	void SetupHandler(USBHW *, uint8_t bEP, TSetupPacket *Setup);
 
 	uint8_t HandleStdDeviceReq(TSetupPacket *pSetup, int *piLen, uint8_t **ppbData);
 	uint8_t HandleStdInterfaceReq(TSetupPacket	*pSetup, int *piLen, uint8_t **ppbData);
@@ -49,7 +50,7 @@ class USBCTRL : public USBHW {
 	int GatherConfigurationDescriptor(int);
 	void DataIn(void);
 
-	uint16_t lastFrameNumber;
+	volatile uint16_t lastFrameNumber;
 
 public:
 	USBCTRL();

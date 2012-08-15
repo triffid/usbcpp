@@ -13,8 +13,8 @@ usbdesc_device USB::device = {
 	0,					// .bDeviceSubClass
 	0,					// .bDeviceProtocol
 	64,					// .bMaxPacketSize0
-	0xFFFF,				// .idVendor
-	0x0005,				// .idProduct
+	0x1d50,				// .idVendor
+	0x6015,				// .idProduct
 	0x0100,				// .bcdDevice
 	0,					// .iManufacturer
 	0,					// .iProduct
@@ -34,16 +34,20 @@ static usbdesc_string_l(10) manufacturer = {
 	{ 'U', 'S', 'B', ' ', 'M', 'a', 'g', 'i', 'c', '!' }
 };
 
-static usbdesc_string_l(8) product = {
-	18,					// .bLength: 2 + 2 * nchars
+static usbdesc_string_l(23) product = {
+	48,					// .bLength: 2 + 2 * nchars
 	DT_STRING,			// .bDescType
-	{ 'S','m','o','o','t','h','i','e' }
+	{ 'S','m','o','o','t','h','i','e',' ','v','0','.','1',' ','p','r','o','t','o','t','y','p','e' }
 };
 
-static usbdesc_string_l(6) serial = {
-	14,					// .bLength: 2 + 2 * nchars
+static usbdesc_string_l(32) serial = {
+	66,					// .bLength: 2 + 2 * nchars
 	DT_STRING,			// .bDescType
-	{ 'A', '1', 'X', 'T', 'Q', 'Z' }
+	{	'0', '1', '2', '3', '4', '5', '6', '7',
+		'0', '1', '2', '3', '4', '5', '6', '7',
+		'0', '1', '2', '3', '4', '5', '6', '7',
+		'0', '1', '2', '3', '4', '5', '6', '7',
+	}
 };
 
 static usbdesc_string_l(7) str_default = {
@@ -81,6 +85,17 @@ USB::USB() {
 
 void USB::init() {
 	iprintf("init\n");
+
+	uint32_t chip_serial[4];
+	HwGetSerialNumber(4, chip_serial);
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 8; i++) {
+			uint8_t c = (chip_serial[j] & 15);
+			serial.str[j * 8 + 7 - i] = (c < 10)?(c + '0'):(c - 10 + 'A');
+			chip_serial[j] >>= 4;
+		}
+	}
+
 	USBCTRL::init(descriptors);
 
 	iprintf("OK\nconnect\n");
@@ -121,7 +136,7 @@ int USB::addInterface(usbdesc_interface *ifp) {
 			n--;
 
 	ifp->bInterfaceNumber = n;
-	iprintf("[inserting Interface %p at %d]\n", ifp, i);
+// 	iprintf("[inserting Interface %p at %d]\n", ifp, i);
 	descriptors[i] = (usbdesc_base *) ifp;
 	conf.bNumInterfaces = n + 1;
 	conf.wTotalLength += descriptors[i]->bLength;
@@ -157,7 +172,7 @@ int USB::getFreeEndpoint() {
 }
 
 int USB::addEndpoint(usbdesc_endpoint *epp) {
-	iprintf("[EP ");
+// 	iprintf("[EP ");
 	uint8_t i;
 	usbdesc_interface *lastif = (usbdesc_interface *) 0;
 	for (i = 0; i < N_DESCRIPTORS; i++) {
@@ -166,17 +181,17 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 		if (descriptors[i]->bDescType == DT_INTERFACE)
 			lastif = (usbdesc_interface *) descriptors[i];
 	}
-	iprintf("%d:%p ", i, lastif);
+// 	iprintf("%d:%p ", i, lastif);
 	if (i >= N_DESCRIPTORS) return -1;
 	if (lastif == (usbdesc_interface *) 0) return -1;
 
 	int n = getFreeEndpoint();
 
-	iprintf("n:%d ", n);
+// 	iprintf("n:%d ", n);
 
-	iprintf("0x%02X:%s ", epp->bEndpointAddress, ((epp->bEndpointAddress & EP_DIR_IN)?"IN":"OUT"));
+// 	iprintf("0x%02X:%s ", epp->bEndpointAddress, ((epp->bEndpointAddress & EP_DIR_IN)?"IN":"OUT"));
 
-	iprintf("%p ", epp);
+// 	iprintf("%p ", epp);
 
 	// TODO: assign .bEndpointAddress appropriately
 	// we need to scan through our descriptors, and find the first unused logical endpoint of the appropriate type
@@ -197,7 +212,7 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 		}
 	}
 
-	iprintf("lep:%d ", lepaddr);
+// 	iprintf("lep:%d ", lepaddr);
 
 	// now, lepaddr is the last logical endpoint of appropriate type
 	// the endpoints go in groups of 3, except for the last one which is a bulk instead of isochronous
@@ -211,17 +226,17 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 	// if it's >15 we've run out, spit an error
 	if (lepaddr > 15) return -1;
 
-	iprintf("pep:%d ", lepaddr);
+// 	iprintf("pep:%d ", lepaddr);
 
 	// store logical address and direction bit as physical address, this is how the LPC17xx has its USB set up
 	epp->bEndpointAddress = lepaddr | (epp->bEndpointAddress & 0x80);
 
-	iprintf("eaddr:0x%02X ", epp->bEndpointAddress);
+// 	iprintf("eaddr:0x%02X ", epp->bEndpointAddress);
 
 	descriptors[i] = (usbdesc_base *) epp;
 	// 	lastif->bNumEndPoints = n + 1;
 
-	iprintf(" EP complete]\n");
+// 	iprintf(" EP complete]\n");
 
 	conf.wTotalLength += descriptors[i]->bLength;
 
@@ -230,9 +245,9 @@ int USB::addEndpoint(usbdesc_endpoint *epp) {
 
 int USB::addString(void *ss) {
 	usbdesc_base *s = (usbdesc_base *) ss;
-	iprintf("[AST %p ", s);
+// 	iprintf("[AST %p ", s);
 	if (s->bDescType == DT_STRING) {
-		iprintf("LEN:%d ", s->bLength);
+// 		iprintf("LEN:%d ", s->bLength);
 
 		uint8_t i;
 		uint8_t stringcount = 0;
@@ -244,17 +259,17 @@ int USB::addString(void *ss) {
 		}
 		if (i >= N_DESCRIPTORS) return -1;
 
-		iprintf("INS %d ", i);
+// 		iprintf("INS %d ", i);
 
 		descriptors[i] = s;
 
 		conf.wTotalLength += descriptors[i]->bLength;
 
-		iprintf("%p STROK]", descriptors[i]);
+// 		iprintf("%p STROK]", descriptors[i]);
 
 		return stringcount;
 	}
-	iprintf("INVAL]\n");
+// 	iprintf("INVAL]\n");
 	return -1;
 }
 

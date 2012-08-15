@@ -12,6 +12,7 @@ USBCDC::USBCDC() {
 	usbif.bInterfaceSubClass	= USB_CDC_SUBCLASS_ACM;
 	usbif.bInterfaceProtocol	= 1;
 	usbif.iInterface			= 0;
+	usbif.setupReceiver			= this;
 
 	cdcheader.bLength           = USB_CDC_LENGTH_HEADER;
 	cdcheader.bDescType         = DT_CDC_DESCRIPTOR;
@@ -44,6 +45,7 @@ USBCDC::USBCDC() {
 	slaveif.bInterfaceSubClass		= 0;
 	slaveif.bInterfaceProtocol		= 0;
 	slaveif.iInterface				= 0;
+	slaveif.setupReceiver			= this;
 
 	intep = {
 		DL_ENDPOINT,
@@ -100,6 +102,48 @@ void USBCDC::attach(USB *usb) {
 	cdcunion.bMasterInterface = IfAddr;
 }
 
-void USBCDC::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
+void USBCDC::EPIntHandler(USBHW *u, uint8_t bEP, uint8_t bEPStatus) {
 	iprintf("[CDC] Ep %02X: %d\n", bEP, bEPStatus);
+	if ((bEP & EP_DIR_MASK) == EP_DIR_IN) {
+		// IN: host reads from device
+		// dummy: no data
+		u->HwEPWrite(bEP, 0, 0);
+	}
+	else {
+		// OUT: host writes to device
+		int r = u->HwEPRead(bEP, rxbuffer, sizeof(rxbuffer));
+		iprintf("[CDC] Recv %d bytes:\n", r);
+		if (r) {
+			rxbuffer[r] = 0;
+			iprintf("%s\n", rxbuffer);
+		}
+	}
+}
+
+void USBCDC::SetupHandler(USBHW *u, uint8_t bEP, TSetupPacket *Setup) {
+	iprintf("[CDC] Setup\n");
+	switch(Setup->bRequest) {
+		case CDC_SET_LINE_CODING: {
+			iprintf("Set Line Encoding\n");
+
+			break;
+		};
+		case CDC_GET_LINE_CODING: {
+			iprintf("Get Line Encoding\n");
+			break;
+		};
+		case CDC_SET_CONTROL_LINE_STATE: {
+			iprintf("Set Control Line State\n");
+
+			break;
+		};
+		case CDC_SEND_BREAK: {
+			iprintf("Send Break\n");
+			break;
+		};
+		default: {
+			iprintf("UNKNOWN\n");
+			break;
+		};
+	}
 }

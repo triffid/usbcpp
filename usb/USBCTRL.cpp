@@ -77,10 +77,10 @@ void USBCTRL::init(usbdesc_base ** d) {
 			}
 		}
 		if (d[i]->bDescType == DT_ENDPOINT) {
-			if (current_conf) {
-				usbdesc_endpoint *e = (usbdesc_endpoint *) d[i];
-				EpHolders[e->bEndpointAddress] = e->callbackReceiver;
-			}
+// 			if (current_conf) {
+// 				usbdesc_endpoint *e = (usbdesc_endpoint *) d[i];
+// 				EpHolders[e->bEndpointAddress] = e->callbackReceiver;
+// 			}
 		}
 	}
 
@@ -111,12 +111,12 @@ void USBCTRL::connect() {
 	USBHW::connect();
 }
 
-void USBCTRL::FrameHandler(uint16_t wFrame) {
+void USBCTRL::FrameHandler(USBHW *u, uint16_t wFrame) {
 // 	iprintf("CTRL:Fr %d\n", wFrame);
 	lastFrameNumber = wFrame;
 }
 
-void USBCTRL::DevIntHandler(uint8_t bDevStatus) {
+void USBCTRL::DevIntHandler(USBHW *u, uint8_t bDevStatus) {
 	iprintf("D%02X\t", bDevStatus);
 	if (bDevStatus & DEV_STATUS_SUSPEND) {
 		HwConfigDevice(FALSE);
@@ -178,17 +178,17 @@ void USBCTRL::DataIn() {
 	iResidue -= iChunk;
 }
 
-void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
+void USBCTRL::EPIntHandler(USBHW *u, uint8_t bEP, uint8_t bEPStatus) {
 	iprintf("E0x%02X:0x%02X\t", bEP, bEPStatus);
 	if (bEP == 0x00) {
 		if (bEPStatus & EP_STATUS_SETUP) {
 			// defaults for data pointer and residue
+			HwEPRead(bEP, (uint8_t *) &Setup, sizeof(Setup));
+
 			uint8_t iType = REQTYPE_GET_TYPE(Setup.bmRequestType);
 			pbData = &apbDataStore[iType][0];
 			iResidue = Setup.wLength;
 			iLen = Setup.wLength;
-
-			HwEPRead(bEP, (uint8_t *) &Setup, sizeof(Setup));
 
 			if ((Setup.wLength == 0) ||
 				(REQTYPE_GET_DIR(Setup.bmRequestType) == REQTYPE_DIR_TO_HOST)) {
@@ -229,16 +229,74 @@ void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
 
 						DataIn();
 
-						break;
-					};
-					default: {
-						iprintf("Unknown Setup ReqType %d - ignored\n", Setup.bmRequestType);
+						return;
 					};
 				}
 			}
-			else {
-				iprintf("Setup Packet: wL=%d, ReqType=%02X - ignored\n", Setup.wLength, Setup.bmRequestType);
+			iprintf("Unknown Setup ReqType %d - ignored\n", Setup.bmRequestType);
+			iprintf("bRequest: %d (0x%02X), wValue: %d, wIndex: %d (0x%X), wLength: %d\n", Setup.bRequest, Setup.bRequest, Setup.wValue, Setup.wIndex, Setup.wIndex, Setup.wLength);
+			iprintf("Dir: %s, ", (REQTYPE_GET_DIR(Setup.bmRequestType)?"Device->Host":"Host->Device"));
+			if (REQTYPE_GET_DIR(Setup.bmRequestType) == REQTYPE_DIR_TO_DEVICE) {
+				iResidue = Setup.wLength;
 			}
+			else {
+				iResidue = 0;
+			}
+			switch (REQTYPE_GET_TYPE(Setup.bmRequestType)) {
+				case REQTYPE_TYPE_STANDARD:
+					iprintf("Type: Standard, ");
+					break;
+				case REQTYPE_TYPE_CLASS:
+					iprintf("Type: Class   , ");
+					break;
+				case REQTYPE_TYPE_VENDOR:
+					iprintf("Type: Vendor  , ");
+					break;
+				default:
+					iprintf("Type: Reserved, ");
+					break;
+			}
+			switch (REQTYPE_GET_RECIP(Setup.bmRequestType)) {
+				case 0:
+					iprintf("Recip: Device\n");
+					break;
+				case 1:
+					iprintf("Recip: Interface 0x%X\n", Setup.wIndex);
+					break;
+				case 2:
+					iprintf("Recip: Endpoint 0x%X\n", Setup.wIndex);
+					break;
+				case 3:
+					iprintf("Recip: Other\n");
+					break;
+				default:
+					iprintf("Recip: unknown\n");
+					break;
+			}
+// 			if (REQTYPE_GET_TYPE(Setup.bmRequestType) == REQTYPE_TYPE_CLASS) {
+// 				// find interface
+// 				int i;
+// 				for (i = 0; descriptors[i] != ((usbdesc_base *) 0); i++) {
+// 					if ((descriptors[i]->bDescType == DT_INTERFACE) && (REQTYPE_GET_RECIP(Setup.bmRequestType) == REQTYPE_RECIP_INTERFACE)) {
+// 						usbdesc_interface *inf = (usbdesc_interface *) descriptors[i];
+// 						if (inf->bInterfaceNumber == Setup.wIndex) {
+// 							iprintf("Firing Interface's setup handler: %p\n", inf->setupReceiver);
+// 							if (inf->setupReceiver) {
+// 								inf->setupReceiver->SetupHandler(u, bEP, &Setup);
+// 								break;
+// 							}
+// 						}
+// 					}
+// 					if ((descriptors[i]->bDescType == DT_ENDPOINT) && (REQTYPE_GET_RECIP(Setup.bmRequestType) == REQTYPE_RECIP_ENDPOINT)) {
+// 						usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
+// 						if (ep->bEndpointAddress == bEP) {
+// 							iprintf("Firing Endpoint's setup handler: %p\n", ep->setupReceiver);
+// 							if (ep->setupReceiver)
+// 								ep->setupReceiver->SetupHandler(u, bEP, &Setup);
+// 						}
+// 					}
+// 				}
+// 			}
 		}
 		else {
 			int iChunk;
@@ -270,16 +328,59 @@ void USBCTRL::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
 				// absorb zero-length status message
 				iChunk = HwEPRead(0x00, NULL, 0);
 				iprintf("g%db\n", iChunk);
+				// acknowledge
+				HwEPWrite(0x80, 0, 0);
 // 				DBG(iChunk > 0 ? "?" : "");
+			}
+		}
+		if (REQTYPE_GET_TYPE(Setup.bmRequestType) == REQTYPE_TYPE_CLASS) {
+			if ((iResidue == Setup.wLength) || (REQTYPE_GET_DIR(Setup.bmRequestType) == REQTYPE_DIR_TO_HOST)) {
+				// find interface
+				int i;
+				for (i = 0; descriptors[i] != ((usbdesc_base *) 0); i++) {
+					if ((descriptors[i]->bDescType == DT_INTERFACE) && (REQTYPE_GET_RECIP(Setup.bmRequestType) == REQTYPE_RECIP_INTERFACE)) {
+						usbdesc_interface *inf = (usbdesc_interface *) descriptors[i];
+						if (inf->bInterfaceNumber == Setup.wIndex) {
+							iprintf("Firing Interface's setup handler: %p\n", inf->setupReceiver);
+							if (inf->setupReceiver) {
+								inf->setupReceiver->SetupHandler(u, bEP, &Setup);
+								break;
+							}
+						}
+					}
+					if ((descriptors[i]->bDescType == DT_ENDPOINT) && (REQTYPE_GET_RECIP(Setup.bmRequestType) == REQTYPE_RECIP_ENDPOINT)) {
+						usbdesc_endpoint *ep = (usbdesc_endpoint *) descriptors[i];
+						if (ep->bEndpointAddress == bEP) {
+							iprintf("Firing Endpoint's setup handler: %p\n", ep->setupReceiver);
+							if (ep->setupReceiver)
+								ep->setupReceiver->SetupHandler(u, bEP, &Setup);
+						}
+					}
+				}
 			}
 		}
 	}
 	else if (bEP == 0x80) {
-
 		DataIn();
+	}
+	else {
+		int i;
+		usbdesc_base *descriptor;
+		for (i = 0; i < 32; i++) {
+			descriptor = descriptors[i];
+			if (descriptor->bDescType == DT_ENDPOINT) {
+				usbdesc_endpoint *endpoint = (usbdesc_endpoint *) descriptor;
+				if (endpoint->bEndpointAddress == bEP) {
+					endpoint->callbackReceiver->EPIntHandler(u, bEP, bEPStatus);
+				}
+			}
+		}
 	}
 }
 
+void USBCTRL::SetupHandler(USBHW *u, uint8_t bEP, TSetupPacket *Setup) {
+
+}
 
 
 /**
@@ -402,7 +503,7 @@ uint8_t USBCTRL::SetConfiguration(uint8_t bConfigIndex, uint8_t bAltSetting) {
 					usbdesc_endpoint *e = (usbdesc_endpoint *) descriptors[i];
 					if ((bCurConfig == bConfigIndex) && (bCurAltSetting == bAltSetting)) {
 						HwEPConfig(e->bEndpointAddress, e->wMaxPacketSize);
-						EpHolders[e->bEndpointAddress] = e->callbackReceiver;
+// 						EpHolders[e->bEndpointAddress] = e->callbackReceiver;
 						bAlternate = bAltSetting;
 					}
 					break;
@@ -524,27 +625,27 @@ uint8_t USBCTRL::HandleStdInterfaceReq(TSetupPacket	*pSetup, int *piLen, uint8_t
 			return FALSE;
 
 		case REQ_GET_INTERFACE:	// TODO use bNumInterfaces
-        // there is only one interface, return n-1 (= 0)
-        pbData[0] = bAlternate;
-		*piLen = 1;
-		break;
+			// there is only one interface, return n-1 (= 0)
+			pbData[0] = bAlternate;
+			*piLen = 1;
+			break;
 
 		case REQ_SET_INTERFACE:	// TODO use bNumInterfaces
-		// there is only one interface (= 0)
-		if (pSetup->wValue > conf->bNumInterfaces) {
-			return FALSE;
-		}
-		iprintf("Set alternate %d", pSetup->wValue);
-		if (SetConfiguration(conf->bConfigurationValue, pSetup->wValue)) {
-// 			DBG(" OK\n");
-			bAlternate = pSetup->wValue;
-		}
-		else {
-// 			DBG(" failed!\n");
-			return FALSE;
-		}
-		*piLen = 0;
-		break;
+			// there is only one interface (= 0)
+			if (pSetup->wValue > conf->bNumInterfaces) {
+				return FALSE;
+			}
+			iprintf("Set alternate %d", pSetup->wValue);
+			if (SetConfiguration(conf->bConfigurationValue, pSetup->wValue)) {
+	// 			DBG(" OK\n");
+				bAlternate = pSetup->wValue;
+			}
+			else {
+	// 			DBG(" failed!\n");
+				return FALSE;
+			}
+			*piLen = 0;
+			break;
 
 		default:
 // 			DBG("Illegal interface req %d\n", pSetup->bRequest);

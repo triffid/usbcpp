@@ -5,7 +5,7 @@
 
 typedef usbdesc_string_l(12) macstr_t;
 
-class USBECM : public USB_EP_Receiver {
+class USBECM : public USB_EP_Receiver, public USB_Setup_Receiver {
 	USB *myusb;
 
 	usbdesc_interface		if0;
@@ -19,7 +19,8 @@ class USBECM : public USB_EP_Receiver {
 	usbdesc_endpoint		InEP;
 	macstr_t				macaddr;
 
-	void EPIntHandler(uint8_t, uint8_t);
+	void EPIntHandler(USBHW *, uint8_t, uint8_t);
+	void SetupHandler(USBHW *, uint8_t, TSetupPacket *);
 
 public:
 	USBECM();

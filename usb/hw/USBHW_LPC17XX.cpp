@@ -64,7 +64,7 @@ void USBHW::init() {
 
 	NVIC_EnableIRQ(USB_IRQn);
 
-// 	LPC_USB->USBDevIntEn |= FRAME | DEV_STAT | EP_SLOW;
+	LPC_USB->USBDevIntEn |= FRAME | DEV_STAT | EP_SLOW;
 	iprintf("Hw.init ok\n");
 }
 
@@ -505,7 +505,7 @@ void USBHW::HwISR(void) {
 			wFrame = HwPorts[0]->HwCmdRead16(CMD_DEV_READ_CUR_FRAME_NR);
 // 			HwPorts[0]->_pfnFrameHandler(wFrame);
 // 			iprintf("Frame %d (%p)\n", wFrame, HwPorts[0]);
-			HwPorts[0]->FrameHandler(wFrame);
+			HwPorts[0]->FrameHandler(HwPorts[0], wFrame);
 // 			iprintf("Frame %d OK\n", wFrame);
 		}
 		dwStatus &= ~(FRAME);
@@ -519,6 +519,7 @@ void USBHW::HwISR(void) {
 		 */
 		LPC_USB->USBDevIntClr = DEV_STAT;
 		bDevStat = HwPorts[0]->HwCmdRead(CMD_DEV_STATUS);
+		iprintf("!DEV STAT %d\n", bDevStat);
 		if (bDevStat & (CON_CH | SUS_CH | RST)) {
 			// convert device status into something HW independent
 			bStat = ((bDevStat & CON) ? DEV_STATUS_CONNECT : 0) |
@@ -528,36 +529,37 @@ void USBHW::HwISR(void) {
 // 			if (HwPorts[0]->_pfnDevIntHandler != NULL) {
 // 				HwPorts[0]->_pfnDevIntHandler(bStat);
 // 			}
-			HwPorts[0]->DevIntHandler(bStat);
+			HwPorts[0]->DevIntHandler(HwPorts[0], bStat);
 		}
 		dwStatus &= ~(DEV_STAT);
 	}
 
 	// endpoint interrupt
 	if (dwStatus & EP_SLOW) {
-		iprintf("EP 0x%08X\n", LPC_USB->USBEpIntSt);
+		iprintf("!EP 0x%08lX\n", LPC_USB->USBEpIntSt);
 		// clear EP_SLOW
 		LPC_USB->USBDevIntClr = EP_SLOW;
 		// check all endpoints
 		for (i = 0; i < 32; i++) {
 			dwIntBit = (1 << i);
-			if (LPC_USB->USBEpIntSt & dwIntBit) {
+			uint8_t st = HwPorts[0]->HwEPGetStatus(IDX2EP(i));
+			if ((LPC_USB->USBEpIntSt & dwIntBit) || (((i & 1) == 0) && (st & EPSTAT_FE))) {
 				iprintf("%d ", i);
 				// clear int (and retrieve status)
 				LPC_USB->USBEpIntClr = dwIntBit;
 				HwPorts[0]->Wait4DevInt(CDFULL);
 				bEPStat = LPC_USB->USBCmdData;
 				// convert EP pipe stat into something HW independent
-				bStat = ((bEPStat & EPSTAT_FE) ? EP_STATUS_DATA : 0) |
-				((bEPStat & EPSTAT_ST) ? EP_STATUS_STALLED : 0) |
-				((bEPStat & EPSTAT_STP) ? EP_STATUS_SETUP : 0) |
-				((bEPStat & EPSTAT_EPN) ? EP_STATUS_NACKED : 0) |
-				((bEPStat & EPSTAT_PO) ? EP_STATUS_ERROR : 0);
+				bStat = ((bEPStat & EPSTAT_FE ) ? EP_STATUS_DATA    : 0) |
+				        ((bEPStat & EPSTAT_ST ) ? EP_STATUS_STALLED : 0) |
+				        ((bEPStat & EPSTAT_STP) ? EP_STATUS_SETUP   : 0) |
+				        ((bEPStat & EPSTAT_EPN) ? EP_STATUS_NACKED  : 0) |
+				        ((bEPStat & EPSTAT_PO ) ? EP_STATUS_ERROR   : 0);
 				// call handler
 // 				if (HwPorts[0]->_apfnEPIntHandlers[i] != NULL) {
 // 					HwPorts[0]->_apfnEPIntHandlers[i](IDX2EP(i), bStat);
 // 				}
-				HwPorts[0]->EPIntHandler(IDX2EP(i), bStat);
+				HwPorts[0]->EPIntHandler(HwPorts[0], IDX2EP(i), bStat);
 			}
 		}
 // 		iprintf("\n");
@@ -566,114 +568,139 @@ void USBHW::HwISR(void) {
 
 	if (dwStatus & ERR_INT) {
 		uint8_t err = HwPorts[0]->HwCmdRead(CMD_DEV_READ_ERROR_STATUS);
-		if (err)
-			iprintf("USB Error: %d\n", err);
-		if (err & PID_ERR)
-			iprintf("\tPID or bad CRC\n");
-		if (err & UEPKT)
-			iprintf("\tUnexpected Packet\n");
-		if (err & DCRC)
-			iprintf("\tData CRC\n");
-		if (err & TIMEOUT)
-			iprintf("\tTimeout\n");
-		if (err & EOP)
-			iprintf("\tEnd of Packet\n");
-		if (err & B_OVRN)
-			iprintf("\tBuffer Overrun\n");
-		if (err & BTSTF)
-			iprintf("\tBit Stuffing Error\n");
-		if (err & TGL_ERR)
-			iprintf("\tWrong toggle bit in USB packet\n");
+// 		if (err)
+// 			iprintf("USB Error: %d\n", err);
+// 		if (err & PID_ERR)
+// 			iprintf("\tPID or bad CRC\n");
+// 		if (err & UEPKT)
+// 			iprintf("\tUnexpected Packet\n");
+// 		if (err & DCRC)
+// 			iprintf("\tData CRC\n");
+// 		if (err & TIMEOUT)
+// 			iprintf("\tTimeout\n");
+// 		if (err & EOP)
+// 			iprintf("\tEnd of Packet\n");
+// 		if (err & B_OVRN)
+// 			iprintf("\tBuffer Overrun\n");
+// 		if (err & BTSTF)
+// 			iprintf("\tBit Stuffing Error\n");
+// 		if (err & TGL_ERR)
+// 			iprintf("\tWrong toggle bit in USB packet\n");
 
 		err = HwPorts[0]->HwCmdRead(CMD_DEV_GET_ERROR_CODE);
-		if (err)
-			iprintf("Error Code: %d\n", err);
-		switch(err & 0xF) {
-			case 1: {
-				iprintf("PID Encoding Error\n");
-				break;
-			};
-			case 2: {
-				iprintf("Unknown PID\n");
-				break;
-			};
-			case 3: {
-				iprintf("Unexpected Packet\n");
-				break;
-			};
-			case 4: {
-				iprintf("Token CRC Error\n");
-				break;
-			};
-			case 5: {
-				iprintf("Data CRC Error\n");
-				break;
-			};
-			case 6: {
-				iprintf("Timeout\n");
-				break;
-			};
-			case 7: {
-				iprintf("Babble\n");
-				break;
-			};
-			case 8: {
-				iprintf("EOP Error\n");
-				break;
-			};
-			case 9: {
-				iprintf("Send/Recv NAK\n");
-				break;
-			};
-			case 10: {
-				iprintf("Stall\n");
-				break;
-			};
-			case 11: {
-				iprintf("Buffer Overrun\n");
-				break;
-			};
-			case 12: {
-				iprintf("Sent Empty Packet (ISO EP)\n");
-				break;
-			};
-			case 13: {
-				iprintf("Bitstuff\n");
-				break;
-			};
-			case 14: {
-				iprintf("Sync Error\n");
-				break;
-			};
-			case 15: {
-				iprintf("Data Wrong Toggle\n");
-				break;
-			};
-		}
+// 		if (err)
+// 			iprintf("Error Code: %d\n", err);
+// 		switch(err & 0xF) {
+// 			case 1: {
+// 				iprintf("PID Encoding Error\n");
+// 				break;
+// 			};
+// 			case 2: {
+// 				iprintf("Unknown PID\n");
+// 				break;
+// 			};
+// 			case 3: {
+// 				iprintf("Unexpected Packet\n");
+// 				break;
+// 			};
+// 			case 4: {
+// 				iprintf("Token CRC Error\n");
+// 				break;
+// 			};
+// 			case 5: {
+// 				iprintf("Data CRC Error\n");
+// 				break;
+// 			};
+// 			case 6: {
+// 				iprintf("Timeout\n");
+// 				break;
+// 			};
+// 			case 7: {
+// 				iprintf("Babble\n");
+// 				break;
+// 			};
+// 			case 8: {
+// 				iprintf("EOP Error\n");
+// 				break;
+// 			};
+// 			case 9: {
+// 				iprintf("Send/Recv NAK\n");
+// 				break;
+// 			};
+// 			case 10: {
+// 				iprintf("Stall\n");
+// 				break;
+// 			};
+// 			case 11: {
+// 				iprintf("Buffer Overrun\n");
+// 				break;
+// 			};
+// 			case 12: {
+// 				iprintf("Sent Empty Packet (ISO EP)\n");
+// 				break;
+// 			};
+// 			case 13: {
+// 				iprintf("Bitstuff\n");
+// 				break;
+// 			};
+// 			case 14: {
+// 				iprintf("Sync Error\n");
+// 				break;
+// 			};
+// 			case 15: {
+// 				iprintf("Data Wrong Toggle\n");
+// 				break;
+// 			};
+// 		}
 		dwStatus &= ~(ERR_INT);
 	}
 
 // 	printf("dwStatus: %ld\n", dwStatus);
 }
 
-void USBHW::FrameHandler(uint16_t wFrame) {
+void USBHW::FrameHandler(USBHW *u, uint16_t wFrame) {
 	iprintf("HW:FrameHandler!\n"); // override me!
 	HwConnect(false);
 }
 
-void USBHW::DevIntHandler(uint8_t bStatus) {
+void USBHW::DevIntHandler(USBHW *u, uint8_t bStatus) {
 	iprintf("HW:DevIntHandler!\n"); // override me!
 	HwConnect(false);
 }
 
-void USBHW::EPIntHandler(uint8_t bEP, uint8_t bEpStatus) {
+void USBHW::EPIntHandler(USBHW *u, uint8_t bEP, uint8_t bEpStatus) {
 	iprintf("HW:EPIntHandler!\n"); // override me!
 	HwConnect(false);
 }
 
+void USBHW::SetupHandler(USBHW *u, uint8_t bEP, TSetupPacket *Setup) {
+	iprintf("HW:SetupHandler!\n"); //override me!
+	HwConnect(false);
+}
+
+uint32_t USBHW::HwGetSerialNumber(int length, uint32_t *buf) {
+	#define IAP_LOCATION 0x1FFF1FF1
+	uint32_t command[1];
+	uint32_t result[5];
+	typedef void (*IAP)(uint32_t*, uint32_t*);
+	IAP iap = (IAP) IAP_LOCATION;
+
+	command[0] = 58;
+	iprintf("Getting Serial...\n");
+	iap(command, result);
+	iprintf("HW Serial Number: %08lX %08lX %08lX %08lX\n", result[1], result[2], result[3], result[4]);
+	int i;
+	for (i = 0; i < 4; i++) {
+		if (i < length) {
+			buf[i] = result[i + 1];
+		}
+	}
+	return i;
+}
+
 extern "C" {
 	__attribute__ ((interrupt)) void USB_IRQHandler()  {
-		iprintf("!");
+// 		iprintf("!");
 		USBHW::HwISR();
 	}
 // 	__attribute__ ((interrupt)) void USBActivity_IRQHandler()  {

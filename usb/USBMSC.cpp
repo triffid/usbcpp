@@ -12,6 +12,7 @@ USBMSC::USBMSC() {
 	mscint.bInterfaceSubClass	= MSC_SUBCLASS_SCSI;
 	mscint.bInterfaceProtocol	= MSC_PROTOCOL_BULK_ONLY;
 	mscint.iInterface			= 0;
+	mscint.setupReceiver		= this;
 
 	epIN = {
 		DL_ENDPOINT,
@@ -20,6 +21,8 @@ USBMSC::USBMSC() {
 		EA_BULK,
 		64,
 		0,
+		0,
+		this,
 	};
 
 	epOUT = {
@@ -29,6 +32,8 @@ USBMSC::USBMSC() {
 		EA_BULK,
 		64,
 		0,
+		0,
+		this,
 	};
 }
 
@@ -40,6 +45,10 @@ void USBMSC::attach(USB *u) {
 	u->addEndpoint(&epIN);
 }
 
-void USBMSC::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
+void USBMSC::EPIntHandler(USBHW *u, uint8_t bEP, uint8_t bEPStatus) {
 	iprintf("[MSC] Ep %02X: %d\n", bEP, bEPStatus);
+}
+
+void USBMSC::SetupHandler(USBHW *u, uint8_t bEP, TSetupPacket *Setup) {
+	iprintf("[MSC] Setup\n");
 }

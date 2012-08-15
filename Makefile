@@ -18,7 +18,7 @@ OUTDIR   = build
 
 OSRC     =
 
-NXPSRC   = $(shell find CMSISv2p00_LPC17xx/ LPC17xxLib/ nxpUSBLib/ -name '*.c')
+NXPSRC   = $(shell find CMSISv2p00_LPC17xx/ LPC17xxLib/ -name '*.c')
 NXPO     = $(patsubst %.c,$(OUTDIR)/%.o,$(notdir $(NXPSRC))) $(OUTDIR)/system_LPC17xx.o
 
 CHIP     = lpc1769

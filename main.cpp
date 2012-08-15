@@ -13,7 +13,7 @@
 USB u;
 
 USBCDC uc;
-USBMSC msc;
+// USBMSC msc;
 USBECM ecm;
 
 WATCHDOG w(5 WATCHDOG_SECONDS);
@@ -52,7 +52,7 @@ int main(void) {
 	iprintf("start\n");
 
 	uc.attach(&u);
-	msc.attach(&u);
+// 	msc.attach(&u);
 	ecm.setMAC(mac);
 	ecm.attach(&u);
 

@@ -3,7 +3,7 @@
 
 #include "USB.hpp"
 
-class USBCDC : public USB_EP_Receiver {
+class USBCDC : public USB_EP_Receiver, public USB_Setup_Receiver {
 	usbdesc_interface   usbif;
 	usbcdc_header       cdcheader;
 	usbcdc_callmgmt     cmgmt;
@@ -16,13 +16,17 @@ class USBCDC : public USB_EP_Receiver {
 	usbdesc_endpoint	outep;
 	usbdesc_endpoint	inep;
 
+	uint8_t	rxbuffer[64];
+	uint8_t txbuffer[64];
+
 	uint8_t IfAddr;
 	uint8_t EpIntAddr;
 	uint8_t slaveIfAddr;
 	uint8_t EpOutAddr;
 	uint8_t EpInAddr;
 
-	void EPIntHandler(uint8_t, uint8_t);
+	void EPIntHandler(USBHW *, uint8_t, uint8_t);
+	void SetupHandler(USBHW *, uint8_t, TSetupPacket *);
 
 public:
 	USBCDC();

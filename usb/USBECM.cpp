@@ -14,6 +14,7 @@ USBECM::USBECM() {
 		0,
 		0,
 	};
+	if0.setupReceiver = this;
 	cdcheader = {
 		USB_CDC_LENGTH_HEADER,
 		DT_CDC_DESCRIPTOR,
@@ -46,6 +47,7 @@ USBECM::USBECM() {
 		10,
 		0,
 		this,
+		this,
 	};
 	ifnop = {
 		DL_INTERFACE,
@@ -58,6 +60,7 @@ USBECM::USBECM() {
 		0,
 		0,
 	};
+	ifnop.setupReceiver = this;
 	ifdata = {
 		DL_INTERFACE,
 		DT_INTERFACE,
@@ -69,6 +72,7 @@ USBECM::USBECM() {
 		0,
 		0,
 	};
+	ifdata.setupReceiver = this;
 	OutEP = {
 		DL_ENDPOINT,
 		DT_ENDPOINT,
@@ -77,6 +81,7 @@ USBECM::USBECM() {
 		64,
 		0,
 		0,
+		this,
 		this,
 	};
 	InEP = {
@@ -87,6 +92,7 @@ USBECM::USBECM() {
 		64,
 		0,
 		0,
+		this,
 		this,
 	};
 	macaddr.bLength = 26;
@@ -141,6 +147,10 @@ void USBECM::attach(USB *u) {
 	cdcether.iMacAddress = r;
 }
 
-void USBECM::EPIntHandler(uint8_t bEP, uint8_t bEPStatus) {
+void USBECM::EPIntHandler(USBHW *u, uint8_t bEP, uint8_t bEPStatus) {
 	iprintf("[ECM] Ep %02X: %d\n", bEP, bEPStatus);
+}
+
+void USBECM::SetupHandler(USBHW *, uint8_t, TSetupPacket *) {
+	iprintf("[ECM] Setup\n");
 }

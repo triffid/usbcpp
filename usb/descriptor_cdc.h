@@ -27,6 +27,11 @@
 #define USB_CDC_SUBTYPE_OBEX             0x15
 #define USB_CDC_SUBTYPE_NCM              0x1a
 
+#define CDC_SET_LINE_CODING        0x20
+#define CDC_GET_LINE_CODING        0x21
+#define CDC_SET_CONTROL_LINE_STATE 0x22
+#define CDC_SEND_BREAK             0x23
+
 typedef struct __attribute__ ((packed)) {
 	uint8_t	bLength;      // 5
 	uint8_t	bDescType;    // DT_CDC_DESCRIPTOR      (0x24)

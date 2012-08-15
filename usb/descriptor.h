@@ -22,7 +22,7 @@
 #define DT_ENDPOINT                 5
 
 #define USB_VERSION_1_0             0x0100
-#define USB_VERSION_1_1             0x0101
+#define USB_VERSION_1_1             0x0110
 #define USB_VERSION_2_0             0x0200
 #define USB_VERSION_3_0             0x0300
 
@@ -48,6 +48,7 @@
 #define CA_SELFPOWERED              0x40
 #define CA_REMOTEWAKEUP             0x20
 
+#define EP_DIR_MASK					0x80
 #define	EP_DIR_OUT					0x00
 #define	EP_DIR_IN					0x80
 
@@ -70,6 +71,7 @@
 #define SL_GERMAN                   0x0407
 
 class USB_EP_Receiver;
+class USB_Setup_Receiver;
 
 typedef struct {
 	uint8_t		bLength;			// descriptor length
@@ -114,6 +116,8 @@ typedef struct __attribute__ ((packed)) {
 	uint8_t		bInterfaceSubClass;		// Subclass Code
 	uint8_t		bInterfaceProtocol;		// Protocol Code
 	uint8_t		iInterface;				// Index of String Descriptor Describing this interface
+	uint8_t		dummy[3];				// pad to 32 bit boundary
+	USB_Setup_Receiver *setupReceiver; // who do we call when we receive a setup packet for this interface?
 } usbdesc_interface;
 
 typedef struct __attribute__ ((packed)) {
@@ -125,6 +129,7 @@ typedef struct __attribute__ ((packed)) {
 	uint8_t		bInterval;				// Interval for polling endpoint data transfers. Value in frame counts. Ignored for Bulk & Control Endpoints. Isochronous must equal 1 and field may range from 1 to 255 for interrupt endpoints.
 	uint8_t		dummy;
 	USB_EP_Receiver *callbackReceiver;	// Who do we call when something happens on this endpoint?
+	USB_Setup_Receiver *setupReceiver; // who do we call when we receive a setup packet for this interface?
 } usbdesc_endpoint;
 
 typedef struct __attribute__ ((packed)) {

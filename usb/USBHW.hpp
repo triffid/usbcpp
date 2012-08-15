@@ -16,22 +16,29 @@ typedef void (TFnDevIntHandler)	(uint8_t bDevStatus);
 typedef void (TFnFrameHandler)(uint16_t wFrame);
 typedef uint8_t (TFnHandleRequest)(TSetupPacket *pSetup, int *piLen, uint8_t **ppbData);
 
+class USBHW;
+
 class USB_EP_Receiver {
 public:
-	virtual void EPIntHandler(uint8_t bEP, uint8_t bEPStatus) = 0;
+	virtual void EPIntHandler(USBHW *u, uint8_t bEP, uint8_t bEPStatus) = 0;
 };
 
 class USB_DevInt_Receiver {
 public:
-	virtual void DevIntHandler(uint8_t bDevStatus) = 0;
+	virtual void DevIntHandler(USBHW *u, uint8_t bDevStatus) = 0;
 };
 
 class USB_Frame_Receiver {
 public:
-	virtual void FrameHandler(uint16_t wFrame) = 0;
+	virtual void FrameHandler(USBHW *u, uint16_t wFrame) = 0;
 };
 
-class USBHW : public USB_EP_Receiver, public USB_DevInt_Receiver, USB_Frame_Receiver {
+class USB_Setup_Receiver {
+public:
+	virtual void SetupHandler(USBHW *u, uint8_t bEP, TSetupPacket *Setup) = 0;
+};
+
+class USBHW : public USB_EP_Receiver, public USB_DevInt_Receiver, USB_Frame_Receiver, USB_Setup_Receiver {
 public:
 	USBHW();
 	USBHW(int HwPortIndex);
@@ -41,13 +48,16 @@ public:
 	static int		HwPortCount(void);
 	static void		HwISR(void);
 
+	static uint32_t		HwGetSerialNumber(int, uint32_t *);
+
 // 	TFnDevIntHandler	*_pfnDevIntHandler;
 // 	TFnEPIntHandler	*_apfnEPIntHandlers[32];
 // 	TFnFrameHandler	*_pfnFrameHandler;
 
-	void EPIntHandler(uint8_t bEP, uint8_t bEPStatus);
-	void DevIntHandler(uint8_t bDevStatus);
-	void FrameHandler(uint16_t wFrame);
+	void EPIntHandler(USBHW *, uint8_t bEP, uint8_t bEPStatus);
+	void DevIntHandler(USBHW *, uint8_t bDevStatus);
+	void FrameHandler(USBHW *, uint16_t wFrame);
+	void SetupHandler(USBHW *, uint8_t bEP, TSetupPacket *Setup);
 
 	void			Wait4DevInt(uint32_t dwIntr);
 
